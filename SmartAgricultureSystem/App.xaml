@@ -1,0 +1,11 @@
+﻿<Application x:Class="SmartAgricultureSystem.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:SmartAgricultureSystem"
+             xmlns:helpers="clr-namespace:SmartAgricultureSystem.Helpers"
+             StartupUri="Views/LoginWindow.xaml">
+    <Application.Resources>
+        <helpers:StringToVisibilityConverter x:Key="StringToVisibilityConverter"/>
+        <helpers:BoolToColorConverter x:Key="BoolToColorConverter"/>
+    </Application.Resources>
+</Application>

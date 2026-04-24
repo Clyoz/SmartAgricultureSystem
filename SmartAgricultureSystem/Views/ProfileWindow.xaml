@@ -1,0 +1,125 @@
+﻿<Window x:Class="SmartAgricultureSystem.Views.ProfileWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="个人信息管理"
+        Height="620" Width="480"
+        WindowStartupLocation="CenterOwner"
+        Background="#1E1E2E">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="30,20">
+
+            <!-- 用户头像和基本信息 -->
+            <Border Background="#313244" CornerRadius="12" Padding="20" Margin="0,0,0,20">
+                <StackPanel Orientation="Horizontal">
+                    <!-- 头像 -->
+                    <Border Width="70" Height="70" CornerRadius="35"
+                            BorderBrush="#89B4FA" BorderThickness="2">
+                        <Border.Background>
+                            <ImageBrush x:Name="AvatarBrush"
+                                        ImageSource="{Binding CurrentUser.avatarPath}"
+                                        Stretch="UniformToFill"/>
+                        </Border.Background>
+                    </Border>
+                    <!-- 用户信息 -->
+                    <StackPanel Margin="15,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding CurrentUser.nickname}"
+                                   FontSize="18" FontWeight="Bold"
+                                   Foreground="White"/>
+                        <TextBlock Text="{Binding CurrentUser.username}"
+                                   Foreground="#6C7086" FontSize="13"/>
+                        <TextBlock Text="{Binding RoleDisplayText}"
+                                   Foreground="#A6E3A1" FontSize="13"
+                                   Margin="0,4,0,0"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- 修改头像按钮 -->
+            <Button Content="📷 更换头像"
+                    Command="{Binding ChangeAvatarCommand}"
+                    Background="#45475A" Foreground="White"
+                    Padding="0,8" Margin="0,0,0,20" Cursor="Hand"/>
+
+            <!-- 修改昵称 -->
+            <TextBlock Text="修改昵称" Foreground="#CDD6F4"
+                       FontWeight="Bold" Margin="0,0,0,8"/>
+            <Grid Margin="0,0,0,20">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="80"/>
+                </Grid.ColumnDefinitions>
+                <TextBox Grid.Column="0"
+                         Text="{Binding EditNickname, UpdateSourceTrigger=PropertyChanged}"
+                         Background="#313244" Foreground="White"
+                         Padding="10,8" Margin="0,0,8,0"/>
+                <Button Grid.Column="1" Content="保存"
+                        Command="{Binding SaveNicknameCommand}"
+                        Background="#A6E3A1" Foreground="#1E1E2E"
+                        FontWeight="Bold" Cursor="Hand"/>
+            </Grid>
+            <!-- 绑定手机号 -->
+            <TextBlock Text="绑定手机号（模拟）" Foreground="#CDD6F4"
+                       FontWeight="Bold" Margin="0,0,0,8"/>
+            <Grid Margin="0,0,0,20">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="80"/>
+                </Grid.ColumnDefinitions>
+                <TextBox Grid.Column="0"
+                         Text="{Binding EditPhone, UpdateSourceTrigger=PropertyChanged}"
+                         Background="#313244" Foreground="White"
+                         Padding="10,8" Margin="0,0,8,0"/>
+                <Button Grid.Column="1" Content="绑定"
+                        Command="{Binding BindPhoneCommand}"
+                        Background="#89B4FA" Foreground="#1E1E2E"
+                        FontWeight="Bold" Cursor="Hand"/>
+            </Grid>
+
+            <!-- 修改密码 -->
+            <TextBlock Text="修改密码" Foreground="#CDD6F4"
+                       FontWeight="Bold" Margin="0,0,0,8"/>
+            <Border Background="#313244" CornerRadius="8" Padding="15" Margin="0,0,0,20">
+                <StackPanel>
+                    <TextBlock Text="原密码" Foreground="#6C7086" Margin="0,0,0,5"/>
+                    <PasswordBox x:Name="PwdOld"
+                                 Background="#45475A" Foreground="White"
+                                 Padding="10,8" Margin="0,0,0,10"/>
+                    <TextBlock Text="新密码" Foreground="#6C7086" Margin="0,0,0,5"/>
+                    <PasswordBox x:Name="PwdNew"
+                                 Background="#45475A" Foreground="White"
+                                 Padding="10,8" Margin="0,0,0,10"/>
+                    <TextBlock Text="确认新密码" Foreground="#6C7086" Margin="0,0,0,5"/>
+                    <PasswordBox x:Name="PwdConfirm"
+                                 Background="#45475A" Foreground="White"
+                                 Padding="10,8" Margin="0,0,0,10"/>
+                    <Button Content="确认修改密码"
+                            Click="BtnChangePassword_Click"
+                            Background="#F38BA8" Foreground="#1E1E2E"
+                            FontWeight="Bold" Padding="0,10" Cursor="Hand"/>
+                </StackPanel>
+            </Border>
+
+            <!-- 操作结果提示 -->
+            <Border x:Name="ResultBorder"
+                    CornerRadius="6" Padding="12,8" Margin="0,0,0,15"
+                    Visibility="{Binding ResultMessage,
+                        Converter={StaticResource StringToVisibilityConverter}}">
+                <Border.Background>
+                    <SolidColorBrush Color="{Binding IsResultSuccess,
+                        Converter={StaticResource BoolToColorConverter}}"/>
+                </Border.Background>
+                <TextBlock Text="{Binding ResultMessage}"
+                           Foreground="White" TextWrapping="Wrap"/>
+            </Border>
+
+            <!-- 退出登录 -->
+            <Button Content="🚪 退出登录"
+                    Command="{Binding LogoutCommand}"
+                    Background="#45475A" Foreground="#F38BA8"
+                    FontSize="14" FontWeight="Bold"
+                    Padding="0,12" Cursor="Hand"/>
+
+        </StackPanel>
+    </ScrollViewer>
+</Window>
