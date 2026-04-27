@@ -29,6 +29,9 @@ namespace SmartAgricultureSystem.ViewModels
         // 数据库服务
         private readonly DatabaseService mDatabaseService;
 
+        // 认证服务（用于退出登录）
+        private AuthService mAuthService;
+
         // 预警服务
         private readonly AlertService mAlertService;
 
@@ -37,6 +40,9 @@ namespace SmartAgricultureSystem.ViewModels
 
         // 定时采集的取消令牌
         private CancellationTokenSource mCancellationTokenSource;
+
+        // 单次读取的取消令牌（连接后定时读取当前值）
+        private CancellationTokenSource mReadCurrentCts;
 
         // 当前温度
         private double mCurrentTemperature;
@@ -56,11 +62,17 @@ namespace SmartAgricultureSystem.ViewModels
         // 是否使用虚拟模式
         private bool mIsVirtualMode;
 
+        // 是否已连接
+        private bool mIsConnected;
+
         // 设备IP地址
         private string mDeviceIp = "192.168.1.100";
 
         // 设备端口
         private int mDevicePort = 502;
+
+        // 当前登录用户名
+        private string mCurrentUsername;
 
         // 图表时间标签集合
         public ObservableCollection<string> TimeLabels { get; set; }
@@ -73,6 +85,7 @@ namespace SmartAgricultureSystem.ViewModels
 
         // 湿度折线图数据
         private ChartValues<double> mHumidityValues;
+
         // 历史数据列表（用于DataGrid展示）
         public ObservableCollection<SensorData> HistoryData { get; set; }
 
@@ -113,6 +126,13 @@ namespace SmartAgricultureSystem.ViewModels
             set { mIsRunning = value; OnPropertyChanged(); }
         }
 
+        /// <summary>是否已连接（绑定到UI）</summary>
+        public bool IsConnected
+        {
+            get => mIsConnected;
+            set { mIsConnected = value; OnPropertyChanged(); }
+        }
+
         /// <summary>设备IP地址（绑定到UI）</summary>
         public string DeviceIp
         {
@@ -134,6 +154,13 @@ namespace SmartAgricultureSystem.ViewModels
             set { mIsVirtualMode = value; OnPropertyChanged(); }
         }
 
+        /// <summary>当前登录用户名（绑定到UI）</summary>
+        public string CurrentUsername
+        {
+            get => mCurrentUsername;
+            set { mCurrentUsername = value; OnPropertyChanged(); }
+        }
+
         #endregion
         #region 命令
 
@@ -152,7 +179,13 @@ namespace SmartAgricultureSystem.ViewModels
         /// <summary>切换虚拟模式命令</summary>
         public ICommand ToggleVirtualModeCommand { get; }
 
+        /// <summary>退出登录命令</summary>
+        public ICommand LogoutCommand { get; }
+
         #endregion
+
+        /// <summary>退出登录回调</summary>
+        public System.Action OnLogoutCallback { get; set; }
 
         /// <summary>
         /// 构造函数，初始化所有服务和命令
@@ -187,19 +220,53 @@ namespace SmartAgricultureSystem.ViewModels
             };
 
             // 绑定命令
-            ConnectCommand = new RelayCommand(async _ => await ConnectAsync());
-            DisconnectCommand = new RelayCommand(_ => Disconnect());
-            StartCollectCommand = new RelayCommand(async _ => await StartCollectingAsync());
-            StopCollectCommand = new RelayCommand(_ => StopCollecting());
+            ConnectCommand = new RelayCommand(async _ => await ConnectAsync(), _ => !IsConnected);
+            DisconnectCommand = new RelayCommand(_ => Disconnect(), _ => IsConnected);
+            StartCollectCommand = new RelayCommand(async _ => await StartCollectingAsync(), _ => IsConnected && !IsRunning);
+            StopCollectCommand = new RelayCommand(_ => StopCollecting(), _ => IsRunning);
             ToggleVirtualModeCommand = new RelayCommand(async _ => await ToggleVirtualModeAsync());
+            LogoutCommand = new RelayCommand(async _ => await LogoutAsync());
 
             ConnectionStatus = "未连接";
-
-            // 初始化数据库
-            _ = mDatabaseService.InitializeAsync();
         }
+
+        /// <summary>
+        /// 设置当前用户信息
+        /// </summary>
+        public void SetCurrentUser(string username)
+        {
+            CurrentUsername = username;
+        }
+
+        /// <summary>
+        /// 设置认证服务（用于退出登录）
+        /// </summary>
+        public void SetAuthService(AuthService authService)
+        {
+            mAuthService = authService;
+        }
+
+        /// <summary>
+        /// 退出登录
+        /// </summary>
+        private async Task LogoutAsync()
+        {
+            // 先停止采集和断开连接
+            if (IsRunning) StopCollecting();
+            if (IsConnected) Disconnect();
+
+            // 调用AuthService清除服务端会话
+            if (mAuthService != null)
+            {
+                await mAuthService.LogoutAsync();
+            }
+
+            OnLogoutCallback?.Invoke();
+        }
+
         /// <summary>
         /// 异步连接到Modbus设备
+        /// 连接后定时读取当前温湿度值（仅更新数值卡片，不更新曲线图）
         /// </summary>
         private async Task ConnectAsync()
         {
@@ -214,7 +281,17 @@ namespace SmartAgricultureSystem.ViewModels
                     mVirtualSlave.Start();
                     mModbusService = new ModbusService("127.0.0.1", 5020);
                     bool success = await mModbusService.ConnectAsync();
-                    ConnectionStatus = success ? "已连接 (虚拟模式 127.0.0.1:5020)" : "虚拟模式连接失败";
+                    if (success)
+                    {
+                        IsConnected = true;
+                        ConnectionStatus = "已连接 (虚拟模式 127.0.0.1:5020)";
+                        // 启动定时读取当前值
+                        StartReadingCurrentValues();
+                    }
+                    else
+                    {
+                        ConnectionStatus = "虚拟模式连接失败";
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -224,25 +301,116 @@ namespace SmartAgricultureSystem.ViewModels
             else
             {
                 // 真实设备模式
-                mModbusService = new ModbusService(DeviceIp, DevicePort);
-                bool success = await mModbusService.ConnectAsync();
-                ConnectionStatus = success ? $"已连接 ({DeviceIp}:{DevicePort})" : "连接失败";
+                try
+                {
+                    mModbusService = new ModbusService(DeviceIp, DevicePort);
+                    bool success = await mModbusService.ConnectAsync();
+                    if (success)
+                    {
+                        IsConnected = true;
+                        ConnectionStatus = $"已连接 ({DeviceIp}:{DevicePort})";
+                        // 启动定时读取当前值
+                        StartReadingCurrentValues();
+                    }
+                    else
+                    {
+                        ConnectionStatus = "连接失败";
+                    }
+                }
+                catch (Exception ex)
+                {
+                    ConnectionStatus = $"连接失败: {ex.Message}";
+                }
             }
         }
 
         /// <summary>
+        /// 连接后启动定时读取当前温湿度值（仅更新数值卡片，不更新曲线图）
+        /// </summary>
+        private void StartReadingCurrentValues()
+        {
+            mReadCurrentCts = new CancellationTokenSource();
+            var token = mReadCurrentCts.Token;
+
+            _ = Task.Run(async () =>
+            {
+                while (!token.IsCancellationRequested && mModbusService != null && mModbusService.IsConnected)
+                {
+                    try
+                    {
+                        var (temp, humidity) = await mModbusService.ReadTempHumidityAsync();
+
+                        if (!double.IsNaN(temp) && !double.IsNaN(humidity))
+                        {
+                            Application.Current.Dispatcher.Invoke(() =>
+                            {
+                                CurrentTemperature = temp;
+                                CurrentHumidity = humidity;
+                            });
+                        }
+
+                        await Task.Delay(1000, token);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[读取当前值] 异常: {ex.Message}");
+                    }
+                }
+            }, token);
+        }
+
+        /// <summary>
+        /// 停止定时读取当前值
+        /// </summary>
+        private void StopReadingCurrentValues()
+        {
+            mReadCurrentCts?.Cancel();
+        }
+
+        /// <summary>
         /// 断开设备连接
+        /// IP地址和端口号输入栏清空，温湿度曲线图初始化
         /// </summary>
         private void Disconnect()
         {
+            // 停止采集（如果正在运行）
             StopCollecting();
+            // 停止读取当前值
+            StopReadingCurrentValues();
+
             mModbusService?.Dispose();
             mVirtualSlave?.Stop();
-            ConnectionStatus = "已断开";
+
+            IsConnected = false;
+            ConnectionStatus = "未连接";
+
+            // 清空IP地址和端口号
+            DeviceIp = string.Empty;
+            DevicePort = 0;
+
+            // 重置当前温湿度显示
+            CurrentTemperature = 0;
+            CurrentHumidity = 0;
+
+            // 初始化温湿度曲线图（清空所有数据点）
+            mTemperatureValues.Clear();
+            mHumidityValues.Clear();
+            TimeLabels.Clear();
+
+            // 清空历史数据列表
+            HistoryData.Clear();
+
+            // 清空预警信息
+            LatestAlert = string.Empty;
         }
 
         /// <summary>
         /// 开始定时采集数据
+        /// 根据传感器的温湿度数据，更新温湿度监测曲线图，并能根据时间实时更新
         /// </summary>
         private async Task StartCollectingAsync()
         {
@@ -251,6 +419,9 @@ namespace SmartAgricultureSystem.ViewModels
                 MessageBox.Show("请先连接设备！", "提示");
                 return;
             }
+
+            // 停止简单的当前值读取，采集模式会包含更完整的数据处理
+            StopReadingCurrentValues();
 
             IsRunning = true;
             mCancellationTokenSource = new CancellationTokenSource();
@@ -269,7 +440,9 @@ namespace SmartAgricultureSystem.ViewModels
                         {
                             var data = new SensorData
                             {
-                                deviceId = DeviceIp,
+                                sensorId = 1,
+                                deviceId = 1,
+                                greenhouseId = 1,
                                 temperature = temp,
                                 humidity = humidity,
                                 timestamp = DateTime.Now,
@@ -287,7 +460,7 @@ namespace SmartAgricultureSystem.ViewModels
                                 CurrentTemperature = temp;
                                 CurrentHumidity = humidity;
 
-                                // 图表最多保留50个点
+                                // 更新温湿度监测曲线图
                                 if (mTemperatureValues.Count >= 50)
                                 {
                                     mTemperatureValues.RemoveAt(0);
@@ -322,6 +495,7 @@ namespace SmartAgricultureSystem.ViewModels
                 }
             }, token);
         }
+
         /// <summary>
         /// 切换虚拟模式
         /// </summary>
@@ -357,11 +531,18 @@ namespace SmartAgricultureSystem.ViewModels
 
         /// <summary>
         /// 停止数据采集
+        /// 曲线图取消实时更新，但保留已有数据
         /// </summary>
         private void StopCollecting()
         {
             mCancellationTokenSource?.Cancel();
             IsRunning = false;
+
+            // 停止采集后，恢复简单的当前值读取
+            if (IsConnected && mModbusService != null && mModbusService.IsConnected)
+            {
+                StartReadingCurrentValues();
+            }
         }
 
         /// <summary>

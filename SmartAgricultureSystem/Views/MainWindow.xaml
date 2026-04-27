@@ -6,16 +6,10 @@
         Height="700" Width="1100"
         Background="#1E1E2E">
 
-    <!-- 绑定ViewModel -->
-    <Window.DataContext>
-        <vm:MainViewModel xmlns:vm=
-            "clr-namespace:SmartAgricultureSystem.ViewModels"/>
-    </Window.DataContext>
-
     <Grid Margin="10">
         <Grid.RowDefinitions>
-            <RowDefinition Height="60"/>
-            <!-- 标题栏 -->
+            <RowDefinition Height="50"/>
+            <!-- 标题栏+用户信息 -->
             <RowDefinition Height="80"/>
             <!-- 连接配置 -->
             <RowDefinition Height="120"/>
@@ -28,13 +22,28 @@
             <!-- 预警信息 -->
         </Grid.RowDefinitions>
 
-        <!-- 标题 -->
-        <TextBlock Grid.Row="0"
-                   Text="🌱 智慧农业温湿度检测与预警系统"
-                   FontSize="22" FontWeight="Bold"
-                   Foreground="#A6E3A1"
-                   VerticalAlignment="Center"
-                   HorizontalAlignment="Center"/>
+        <!-- 标题 + 用户信息 -->
+        <Grid Grid.Row="0">
+            <TextBlock Text="智慧农业温湿度检测与预警系统"
+                       FontSize="22" FontWeight="Bold"
+                       Foreground="#A6E3A1"
+                       VerticalAlignment="Center"
+                       HorizontalAlignment="Center"/>
+            <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Center">
+                <TextBlock Foreground="#CDD6F4" FontSize="14"
+                           VerticalAlignment="Center" Margin="0,0,5,0">
+                    <Run Text="当前用户: "/>
+                    <Run Text="{Binding CurrentUsername, Mode=OneWay}" FontWeight="Bold"/>
+                </TextBlock>
+                <Button Content="退出登录" Command="{Binding LogoutCommand}"
+                        Background="#F38BA8" Foreground="#1E1E2E"
+                        FontWeight="Bold" FontSize="12"
+                        Padding="10,4" Margin="5,0"
+                        Cursor="Hand"/>
+            </StackPanel>
+        </Grid>
 
         <!-- 连接配置区 -->
         <StackPanel Grid.Row="1" Orientation="Horizontal"
@@ -44,22 +53,29 @@
                       VerticalAlignment="Center" Margin="5,0"
                       Command="{Binding ToggleVirtualModeCommand}"/>
             <TextBlock Text="IP地址:" Foreground="White" VerticalAlignment="Center" Margin="5"/>
-            <TextBox Text="{Binding DeviceIp}" Width="130" Margin="5"
-                     Background="#313244" Foreground="White" Padding="5"/>
+            <TextBox Text="{Binding DeviceIp, UpdateSourceTrigger=PropertyChanged}" Width="130" Margin="5"
+                     Background="#313244" Foreground="White" Padding="5"
+                     IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBoolConverter}}"/>
             <TextBlock Text="端口:" Foreground="White" VerticalAlignment="Center" Margin="5"/>
-            <TextBox Text="{Binding DevicePort}" Width="60" Margin="5"
-                     Background="#313244" Foreground="White" Padding="5"/>
+            <TextBox Text="{Binding DevicePort, UpdateSourceTrigger=PropertyChanged}" Width="60" Margin="5"
+                     Background="#313244" Foreground="White" Padding="5"
+                     IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBoolConverter}}"/>
             <Button Content="连接" Command="{Binding ConnectCommand}"
-                    Width="80" Margin="5" Background="#89B4FA" FontWeight="Bold"/>
+                    Width="80" Margin="5" Background="#89B4FA" FontWeight="Bold"
+                    Cursor="Hand"/>
             <Button Content="断开" Command="{Binding DisconnectCommand}"
-                    Width="80" Margin="5" Background="#F38BA8" FontWeight="Bold"/>
+                    Width="80" Margin="5" Background="#F38BA8" FontWeight="Bold"
+                    Cursor="Hand"/>
             <Button Content="开始采集" Command="{Binding StartCollectCommand}"
-                    Width="90" Margin="5" Background="#A6E3A1" FontWeight="Bold"/>
+                    Width="90" Margin="5" Background="#A6E3A1" FontWeight="Bold"
+                    Cursor="Hand"/>
             <Button Content="停止采集" Command="{Binding StopCollectCommand}"
-                    Width="90" Margin="5" Background="#FAB387" FontWeight="Bold"/>
+                    Width="90" Margin="5" Background="#FAB387" FontWeight="Bold"
+                    Cursor="Hand"/>
             <TextBlock Text="{Binding ConnectionStatus}"
                        Foreground="#CDD6F4" VerticalAlignment="Center" Margin="10,5"/>
         </StackPanel>
+
         <!-- 实时数据显示 -->
         <StackPanel Grid.Row="2" Orientation="Horizontal"
                     HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -67,7 +83,7 @@
             <Border Background="#313244" CornerRadius="10"
                     Padding="20,10" Margin="20,5">
                 <StackPanel>
-                    <TextBlock Text="🌡 当前温度" Foreground="#CDD6F4"
+                    <TextBlock Text="当前温度" Foreground="#CDD6F4"
                                FontSize="14" HorizontalAlignment="Center"/>
                     <TextBlock FontSize="36" FontWeight="Bold"
                                Foreground="#F38BA8" HorizontalAlignment="Center">
@@ -81,7 +97,7 @@
             <Border Background="#313244" CornerRadius="10"
                     Padding="20,10" Margin="20,5">
                 <StackPanel>
-                    <TextBlock Text="💧 当前湿度" Foreground="#CDD6F4"
+                    <TextBlock Text="当前湿度" Foreground="#CDD6F4"
                                FontSize="14" HorizontalAlignment="Center"/>
                     <TextBlock FontSize="36" FontWeight="Bold"
                                Foreground="#89B4FA" HorizontalAlignment="Center">
@@ -113,7 +129,8 @@
                   Margin="10,5">
             <DataGrid.Columns>
                 <DataGridTextColumn Header="时间" Binding="{Binding timestamp, StringFormat={}{0:HH:mm:ss}}" Width="100"/>
-                <DataGridTextColumn Header="设备ID" Binding="{Binding deviceId}" Width="130"/>
+                <DataGridTextColumn Header="大棚ID" Binding="{Binding greenhouseId}" Width="60"/>
+                <DataGridTextColumn Header="设备ID" Binding="{Binding deviceId}" Width="60"/>
                 <DataGridTextColumn Header="温度(℃)" Binding="{Binding temperature, StringFormat={}{0:F1}}" Width="80"/>
                 <DataGridTextColumn Header="湿度(%)" Binding="{Binding humidity, StringFormat={}{0:F1}}" Width="80"/>
                 <DataGridTextColumn Header="预警" Binding="{Binding isAlert}" Width="60"/>

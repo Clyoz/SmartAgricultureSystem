@@ -1,52 +1,45 @@
 ﻿using SmartAgricultureSystem.Helpers;
 using SmartAgricultureSystem.Models;
-using SQLite;
 using System;
 using System.Collections.Generic;
-using System.IO;
+using System.Data;
+using System.Data.SqlClient;
 using System.Threading.Tasks;
 
 namespace SmartAgricultureSystem.Services
 {
     /// <summary>
     /// 用户业务服务
-    /// 负责用户注册、查询、信息修改、账号管理等操作
+    /// 使用 SQL Server + ADO.NET 实现用户注册、查询、信息修改、账号管理等操作
     /// </summary>
     public class UserService
     {
-        // 数据库连接
-        private SQLiteAsyncConnection mConnection;
+        // 数据库服务
+        private readonly DatabaseService mDb;
 
-        // 数据库文件路径
-        private static readonly string DB_PATH =
-            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "AgricultureData.db");
+        public UserService()
+        {
+            mDb = new DatabaseService();
+        }
 
         /// <summary>
-        /// 初始化数据库表，并创建默认管理员账号
+        /// 初始化（确保默认管理员存在）
         /// </summary>
         public async Task InitializeAsync()
         {
-            mConnection = new SQLiteAsyncConnection(DB_PATH);
-            await mConnection.CreateTableAsync<User>();
-            await mConnection.CreateTableAsync<LoginRecord>();
-            // 确保默认管理员存在
             await EnsureDefaultAdminAsync();
         }
 
         /// <summary>
         /// 创建默认管理员账号（admin / Admin@123456）
-        /// 仅在数据库中没有任何管理员时执行
         /// </summary>
         private async Task EnsureDefaultAdminAsync()
         {
-            var adminCount = await mConnection.Table<User>()
-                .Where(u => u.role == UserRole.Admin)
-                .CountAsync();
-
-            if (adminCount == 0)
+            var admin = await GetUserByUsernameAsync("admin");
+            if (admin == null)
             {
                 string salt = PasswordHelper.GenerateSalt();
-                var admin = new User
+                var user = new User
                 {
                     username = "admin",
                     passwordHash = PasswordHelper.HashPassword("Admin@123456", salt),
@@ -55,40 +48,49 @@ namespace SmartAgricultureSystem.Services
                     role = UserRole.Admin,
                     createdAt = DateTime.Now
                 };
-                await mConnection.InsertAsync(admin);
+                await InsertUserAsync(user);
             }
         }
+
+        /// <summary>
+        /// 插入用户
+        /// </summary>
+        private async Task<int> InsertUserAsync(User user)
+        {
+            using (var conn = CreateConnection())
+            {
+                await conn.OpenAsync();
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"
+INSERT INTO Users (username, passwordHash, passwordSalt, nickname, phoneNumber, email,
+    avatarPath, role, isLocked, failedLoginCount, lockUntil, createdAt, lastLoginAt,
+    rememberLogin, rememberToken, tokenExpireAt, remark)
+VALUES (@username, @passwordHash, @passwordSalt, @nickname, @phoneNumber, @email,
+    @avatarPath, @role, @isLocked, @failedLoginCount, @lockUntil, @createdAt, @lastLoginAt,
+    @rememberLogin, @rememberToken, @tokenExpireAt, @remark);
+SELECT SCOPE_IDENTITY();";
+                    AddUserParameters(cmd, user);
+                    var result = await cmd.ExecuteScalarAsync();
+                    return Convert.ToInt32(result);
+                }
+            }
+        }
+
         /// <summary>
         /// 注册新用户
         /// </summary>
-        /// <param name="username">用户名</param>
-        /// <param name="password">原始密码</param>
-        /// <param name="nickname">昵称</param>
-        /// <param name="role">角色，默认农户</param>
-        /// <returns>注册结果消息，null表示成功</returns>
-        public async Task<string> RegisterAsync(
-            string username, string password,
-            string nickname, UserRole role = UserRole.Farmer)
+        public async Task<string> RegisterAsync(string username, string password, string nickname, UserRole role = UserRole.Farmer)
         {
-
-            // 验证用户名格式（4-20位字母数字下划线）
-            if (!System.Text.RegularExpressions.Regex.IsMatch(
-                username, @"^[a-zA-Z0-9_]{4,20}$"))
-            {
+            if (!System.Text.RegularExpressions.Regex.IsMatch(username, @"^[a-zA-Z0-9_]{4,20}$"))
                 return "用户名为4-20位字母、数字或下划线";
-            }
 
-            // 验证密码强度
             string pwdError = PasswordHelper.ValidatePasswordStrength(password);
             if (pwdError != null) return pwdError;
 
-            // 检查用户名是否已存在
-            var existing = await mConnection.Table<User>()
-                .Where(u => u.username == username)
-                .FirstOrDefaultAsync();
+            var existing = await GetUserByUsernameAsync(username);
             if (existing != null) return "用户名已被注册";
 
-            // 生成盐值并哈希密码
             string salt = PasswordHelper.GenerateSalt();
             var newUser = new User
             {
@@ -99,36 +101,74 @@ namespace SmartAgricultureSystem.Services
                 role = role,
                 createdAt = DateTime.Now
             };
-
-            await mConnection.InsertAsync(newUser);
-            return null; // null 表示注册成功
+            await InsertUserAsync(newUser);
+            return null;
         }
 
         /// <summary>
         /// 根据用户名查询用户
         /// </summary>
-        /// <param name="username">用户名</param>
-        /// <returns>用户对象，不存在则返回null</returns>
         public async Task<User> GetUserByUsernameAsync(string username)
         {
-            return await mConnection.Table<User>()
-                .Where(u => u.username == username)
-                .FirstOrDefaultAsync();
+            using (var conn = CreateConnection())
+            {
+                await conn.OpenAsync();
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = "SELECT * FROM Users WHERE username = @username";
+                    cmd.Parameters.AddWithValue("@username", username);
+                    using (var reader = await cmd.ExecuteReaderAsync())
+                    {
+                        if (await reader.ReadAsync())
+                            return ReadUser(reader);
+                    }
+                }
+            }
+            return null;
         }
+
         /// <summary>
         /// 根据ID查询用户
         /// </summary>
         public async Task<User> GetUserByIdAsync(int userId)
         {
-            return await mConnection.GetAsync<User>(userId);
+            using (var conn = CreateConnection())
+            {
+                await conn.OpenAsync();
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = "SELECT * FROM Users WHERE id = @id";
+                    cmd.Parameters.AddWithValue("@id", userId);
+                    using (var reader = await cmd.ExecuteReaderAsync())
+                    {
+                        if (await reader.ReadAsync())
+                            return ReadUser(reader);
+                    }
+                }
+            }
+            return null;
         }
 
         /// <summary>
-        /// 获取所有用户列表（管理员专用）
+        /// 获取所有用户列表
         /// </summary>
         public async Task<List<User>> GetAllUsersAsync()
         {
-            return await mConnection.Table<User>().ToListAsync();
+            var result = new List<User>();
+            using (var conn = CreateConnection())
+            {
+                await conn.OpenAsync();
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = "SELECT * FROM Users ORDER BY createdAt DESC";
+                    using (var reader = await cmd.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                            result.Add(ReadUser(reader));
+                    }
+                }
+            }
+            return result;
         }
 
         /// <summary>
@@ -136,11 +176,16 @@ namespace SmartAgricultureSystem.Services
         /// </summary>
         public async Task UpdateNicknameAsync(int userId, string newNickname)
         {
-            var user = await GetUserByIdAsync(userId);
-            if (user != null)
+            using (var conn = CreateConnection())
             {
-                user.nickname = newNickname;
-                await mConnection.UpdateAsync(user);
+                await conn.OpenAsync();
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = "UPDATE Users SET nickname = @nickname WHERE id = @id";
+                    cmd.Parameters.AddWithValue("@nickname", newNickname);
+                    cmd.Parameters.AddWithValue("@id", userId);
+                    await cmd.ExecuteNonQueryAsync();
+                }
             }
         }
 
@@ -149,205 +194,308 @@ namespace SmartAgricultureSystem.Services
         /// </summary>
         public async Task UpdateAvatarAsync(int userId, string avatarPath)
         {
-            var user = await GetUserByIdAsync(userId);
-            if (user != null)
+            using (var conn = CreateConnection())
             {
-                user.avatarPath = avatarPath;
-                await mConnection.UpdateAsync(user);
+                await conn.OpenAsync();
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = "UPDATE Users SET avatarPath = @avatarPath WHERE id = @id";
+                    cmd.Parameters.AddWithValue("@avatarPath", (object)avatarPath ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@id", userId);
+                    await cmd.ExecuteNonQueryAsync();
+                }
             }
         }
+
         /// <summary>
         /// 修改密码
         /// </summary>
-        /// <param name="userId">用户ID</param>
-        /// <param name="oldPassword">旧密码</param>
-        /// <param name="newPassword">新密码</param>
-        /// <returns>操作结果消息，null表示成功</returns>
-        public async Task<string> ChangePasswordAsync(
-            int userId, string oldPassword, string newPassword)
+        public async Task<string> ChangePasswordAsync(int userId, string oldPassword, string newPassword)
         {
-
             var user = await GetUserByIdAsync(userId);
             if (user == null) return "用户不存在";
 
-            // 验证旧密码
-            if (!PasswordHelper.VerifyPassword(
-                oldPassword, user.passwordHash, user.passwordSalt))
-            {
+            if (!PasswordHelper.VerifyPassword(oldPassword, user.passwordHash, user.passwordSalt))
                 return "原密码错误";
-            }
 
-            // 验证新密码强度
             string pwdError = PasswordHelper.ValidatePasswordStrength(newPassword);
             if (pwdError != null) return pwdError;
 
-            // 新密码不能与旧密码相同
-            if (PasswordHelper.VerifyPassword(
-                newPassword, user.passwordHash, user.passwordSalt))
-            {
+            if (PasswordHelper.VerifyPassword(newPassword, user.passwordHash, user.passwordSalt))
                 return "新密码不能与原密码相同";
-            }
 
-            // 更新密码
             string newSalt = PasswordHelper.GenerateSalt();
-            user.passwordHash = PasswordHelper.HashPassword(newPassword, newSalt);
-            user.passwordSalt = newSalt;
-            await mConnection.UpdateAsync(user);
+            using (var conn = CreateConnection())
+            {
+                await conn.OpenAsync();
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = "UPDATE Users SET passwordHash = @hash, passwordSalt = @salt WHERE id = @id";
+                    cmd.Parameters.AddWithValue("@hash", PasswordHelper.HashPassword(newPassword, newSalt));
+                    cmd.Parameters.AddWithValue("@salt", newSalt);
+                    cmd.Parameters.AddWithValue("@id", userId);
+                    await cmd.ExecuteNonQueryAsync();
+                }
+            }
             return null;
         }
 
         /// <summary>
-        /// 绑定手机号（模拟）
+        /// 绑定手机号
         /// </summary>
         public async Task<string> BindPhoneAsync(int userId, string phone)
         {
-            // 验证手机号格式
-            if (!System.Text.RegularExpressions.Regex.IsMatch(
-                phone, @"^1[3-9]\d{9}$"))
-            {
+            if (!System.Text.RegularExpressions.Regex.IsMatch(phone, @"^1[3-9]\d{9}$"))
                 return "手机号格式不正确";
-            }
 
-            // 检查手机号是否被其他账号绑定
-            var existing = await mConnection.Table<User>()
-                .Where(u => u.phoneNumber == phone && u.id != userId)
-                .FirstOrDefaultAsync();
-            if (existing != null) return "该手机号已被其他账号绑定";
-
-            var user = await GetUserByIdAsync(userId);
-            if (user != null)
+            using (var conn = CreateConnection())
             {
-                user.phoneNumber = phone;
-                await mConnection.UpdateAsync(user);
+                await conn.OpenAsync();
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = "SELECT COUNT(*) FROM Users WHERE phoneNumber = @phone AND id != @id";
+                    cmd.Parameters.AddWithValue("@phone", phone);
+                    cmd.Parameters.AddWithValue("@id", userId);
+                    int count = (int)await cmd.ExecuteScalarAsync();
+                    if (count > 0) return "该手机号已被其他账号绑定";
+                }
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = "UPDATE Users SET phoneNumber = @phone WHERE id = @id";
+                    cmd.Parameters.AddWithValue("@phone", phone);
+                    cmd.Parameters.AddWithValue("@id", userId);
+                    await cmd.ExecuteNonQueryAsync();
+                }
             }
             return null;
         }
+
         /// <summary>
-        /// 锁定账号（管理员操作）
+        /// 锁定账号
         /// </summary>
-        /// <param name="userId">目标用户ID</param>
-        /// <param name="lockMinutes">锁定分钟数，-1表示永久锁定</param>
         public async Task LockUserAsync(int userId, int lockMinutes = -1)
         {
-            var user = await GetUserByIdAsync(userId);
-            if (user != null)
+            using (var conn = CreateConnection())
             {
-                user.isLocked = true;
-                user.lockUntil = lockMinutes == -1
-                    ? DateTime.MaxValue
-                    : DateTime.Now.AddMinutes(lockMinutes);
-                await mConnection.UpdateAsync(user);
+                await conn.OpenAsync();
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"UPDATE Users SET isLocked = 1, lockUntil = @lockUntil WHERE id = @id";
+                    cmd.Parameters.AddWithValue("@lockUntil",
+                        lockMinutes == -1 ? (object)DateTime.MaxValue : DateTime.Now.AddMinutes(lockMinutes));
+                    cmd.Parameters.AddWithValue("@id", userId);
+                    await cmd.ExecuteNonQueryAsync();
+                }
             }
         }
 
         /// <summary>
-        /// 解锁账号（管理员操作）
+        /// 解锁账号
         /// </summary>
         public async Task UnlockUserAsync(int userId)
         {
-            var user = await GetUserByIdAsync(userId);
-            if (user != null)
+            using (var conn = CreateConnection())
             {
-                user.isLocked = false;
-                user.lockUntil = null;
-                user.failedLoginCount = 0;
-                await mConnection.UpdateAsync(user);
+                await conn.OpenAsync();
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"UPDATE Users SET isLocked = 0, lockUntil = NULL, failedLoginCount = 0 WHERE id = @id";
+                    cmd.Parameters.AddWithValue("@id", userId);
+                    await cmd.ExecuteNonQueryAsync();
+                }
             }
         }
 
         /// <summary>
         /// 记录登录日志
         /// </summary>
-        public async Task RecordLoginAsync(
-            string username, bool isSuccess, string failReason = null)
+        public async Task RecordLoginAsync(string username, bool isSuccess, string failReason = null)
         {
-            var record = new LoginRecord
+            using (var conn = CreateConnection())
             {
-                username = username,
-                loginTime = DateTime.Now,
-                isSuccess = isSuccess,
-                failReason = failReason
-            };
-            await mConnection.InsertAsync(record);
+                await conn.OpenAsync();
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"
+INSERT INTO LoginRecords (username, loginTime, isSuccess, failReason)
+VALUES (@username, GETDATE(), @isSuccess, @failReason)";
+                    cmd.Parameters.AddWithValue("@username", username);
+                    cmd.Parameters.AddWithValue("@isSuccess", isSuccess);
+                    cmd.Parameters.AddWithValue("@failReason", (object)failReason ?? DBNull.Value);
+                    await cmd.ExecuteNonQueryAsync();
+                }
+            }
         }
 
         /// <summary>
-        /// 更新用户登录失败次数，超过5次自动锁定30分钟
+        /// 处理登录失败
         /// </summary>
         public async Task HandleLoginFailAsync(User user)
         {
             user.failedLoginCount++;
-            if (user.failedLoginCount >= 5)
+            using (var conn = CreateConnection())
             {
-                user.isLocked = true;
-                user.lockUntil = DateTime.Now.AddMinutes(30);
+                await conn.OpenAsync();
+                using (var cmd = conn.CreateCommand())
+                {
+                    if (user.failedLoginCount >= 5)
+                    {
+                        cmd.CommandText = @"UPDATE Users SET failedLoginCount = @count, isLocked = 1, lockUntil = @lockUntil WHERE id = @id";
+                        cmd.Parameters.AddWithValue("@lockUntil", DateTime.Now.AddMinutes(30));
+                    }
+                    else
+                    {
+                        cmd.CommandText = @"UPDATE Users SET failedLoginCount = @count WHERE id = @id";
+                    }
+                    cmd.Parameters.AddWithValue("@count", user.failedLoginCount);
+                    cmd.Parameters.AddWithValue("@id", user.id);
+                    await cmd.ExecuteNonQueryAsync();
+                }
             }
-            await mConnection.UpdateAsync(user);
-        }
-        /// <summary>
-        /// 重置登录失败次数（登录成功后调用）
-        /// </summary>
-        public async Task ResetLoginFailAsync(User user)
-        {
-            user.failedLoginCount = 0;
-            user.lastLoginAt = DateTime.Now;
-            await mConnection.UpdateAsync(user);
         }
 
         /// <summary>
-        /// 保存"记住登录"Token
+        /// 重置登录失败次数
         /// </summary>
-        public async Task SaveRememberTokenAsync(
-            int userId, string token, DateTime expireAt)
+        public async Task ResetLoginFailAsync(User user)
         {
-            var user = await GetUserByIdAsync(userId);
-            if (user != null)
+            using (var conn = CreateConnection())
             {
-                user.rememberLogin = true;
-                user.rememberToken = token;
-                user.tokenExpireAt = expireAt;
-                await mConnection.UpdateAsync(user);
+                await conn.OpenAsync();
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"UPDATE Users SET failedLoginCount = 0, lastLoginAt = GETDATE() WHERE id = @id";
+                    cmd.Parameters.AddWithValue("@id", user.id);
+                    await cmd.ExecuteNonQueryAsync();
+                }
+            }
+        }
+
+        /// <summary>
+        /// 保存记住登录Token
+        /// </summary>
+        public async Task SaveRememberTokenAsync(int userId, string token, DateTime expireAt)
+        {
+            using (var conn = CreateConnection())
+            {
+                await conn.OpenAsync();
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"UPDATE Users SET rememberLogin = 1, rememberToken = @token, tokenExpireAt = @expireAt WHERE id = @id";
+                    cmd.Parameters.AddWithValue("@token", token);
+                    cmd.Parameters.AddWithValue("@expireAt", expireAt);
+                    cmd.Parameters.AddWithValue("@id", userId);
+                    await cmd.ExecuteNonQueryAsync();
+                }
             }
         }
 
         /// <summary>
         /// 通过Token自动登录
         /// </summary>
-        /// <param name="token">记住登录的Token</param>
-        /// <returns>对应用户，Token无效或过期返回null</returns>
         public async Task<User> AutoLoginByTokenAsync(string token)
         {
             if (string.IsNullOrEmpty(token)) return null;
-            var user = await mConnection.Table<User>()
-                .Where(u => u.rememberToken == token)
-                .FirstOrDefaultAsync();
 
-            // 验证Token有效性
-            if (user == null) return null;
-            if (user.tokenExpireAt == null || user.tokenExpireAt < DateTime.Now)
+            using (var conn = CreateConnection())
             {
-                // Token过期，清除
-                user.rememberToken = null;
-                user.rememberLogin = false;
-                await mConnection.UpdateAsync(user);
-                return null;
+                await conn.OpenAsync();
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = "SELECT * FROM Users WHERE rememberToken = @token";
+                    cmd.Parameters.AddWithValue("@token", token);
+                    using (var reader = await cmd.ExecuteReaderAsync())
+                    {
+                        if (await reader.ReadAsync())
+                        {
+                            var user = ReadUser(reader);
+                            if (user.tokenExpireAt == null || user.tokenExpireAt < DateTime.Now)
+                            {
+                                // Token过期
+                                reader.Close();
+                                await ClearRememberTokenAsync(user.id);
+                                return null;
+                            }
+                            return user;
+                        }
+                    }
+                }
             }
-            return user;
+            return null;
         }
 
         /// <summary>
-        /// 清除记住登录状态（退出登录时调用）
+        /// 清除记住登录状态
         /// </summary>
         public async Task ClearRememberTokenAsync(int userId)
         {
-            var user = await GetUserByIdAsync(userId);
-            if (user != null)
+            using (var conn = CreateConnection())
             {
-                user.rememberToken = null;
-                user.rememberLogin = false;
-                user.tokenExpireAt = null;
-                await mConnection.UpdateAsync(user);
+                await conn.OpenAsync();
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"UPDATE Users SET rememberLogin = 0, rememberToken = NULL, tokenExpireAt = NULL WHERE id = @id";
+                    cmd.Parameters.AddWithValue("@id", userId);
+                    await cmd.ExecuteNonQueryAsync();
+                }
             }
         }
+
+        #region 辅助方法
+
+        private SqlConnection CreateConnection()
+        {
+            return new SqlConnection(
+                System.Configuration.ConfigurationManager.ConnectionStrings["SmartAgricultureDB"]?.ConnectionString
+                ?? "Data Source=localhost;Initial Catalog=SmartAgricultureDB;Integrated Security=True;");
+        }
+
+        private User ReadUser(SqlDataReader reader)
+        {
+            return new User
+            {
+                id = (int)reader["id"],
+                username = reader["username"].ToString(),
+                passwordHash = reader["passwordHash"].ToString(),
+                passwordSalt = reader["passwordSalt"].ToString(),
+                nickname = reader["nickname"]?.ToString(),
+                phoneNumber = reader["phoneNumber"]?.ToString(),
+                email = reader["email"]?.ToString(),
+                avatarPath = reader["avatarPath"]?.ToString(),
+                role = (UserRole)(int)reader["role"],
+                isLocked = (bool)reader["isLocked"],
+                failedLoginCount = (int)reader["failedLoginCount"],
+                lockUntil = reader["lockUntil"] == DBNull.Value ? (DateTime?)null : (DateTime)reader["lockUntil"],
+                createdAt = (DateTime)reader["createdAt"],
+                lastLoginAt = reader["lastLoginAt"] == DBNull.Value ? (DateTime?)null : (DateTime)reader["lastLoginAt"],
+                rememberLogin = reader["rememberLogin"] != DBNull.Value && (bool)reader["rememberLogin"],
+                rememberToken = reader["rememberToken"]?.ToString(),
+                tokenExpireAt = reader["tokenExpireAt"] == DBNull.Value ? (DateTime?)null : (DateTime)reader["tokenExpireAt"],
+                remark = reader["remark"]?.ToString()
+            };
+        }
+
+        private void AddUserParameters(SqlCommand cmd, User user)
+        {
+            cmd.Parameters.AddWithValue("@username", user.username);
+            cmd.Parameters.AddWithValue("@passwordHash", user.passwordHash);
+            cmd.Parameters.AddWithValue("@passwordSalt", user.passwordSalt);
+            cmd.Parameters.AddWithValue("@nickname", (object)user.nickname ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@phoneNumber", (object)user.phoneNumber ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@email", (object)user.email ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@avatarPath", (object)user.avatarPath ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@role", (int)user.role);
+            cmd.Parameters.AddWithValue("@isLocked", user.isLocked);
+            cmd.Parameters.AddWithValue("@failedLoginCount", user.failedLoginCount);
+            cmd.Parameters.AddWithValue("@lockUntil", (object)user.lockUntil ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@createdAt", user.createdAt);
+            cmd.Parameters.AddWithValue("@lastLoginAt", (object)user.lastLoginAt ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@rememberLogin", user.rememberLogin);
+            cmd.Parameters.AddWithValue("@rememberToken", (object)user.rememberToken ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@tokenExpireAt", (object)user.tokenExpireAt ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@remark", (object)user.remark ?? DBNull.Value);
+        }
+
+        #endregion
     }
 }

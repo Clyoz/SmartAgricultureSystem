@@ -3,9 +3,10 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:SmartAgricultureSystem"
              xmlns:helpers="clr-namespace:SmartAgricultureSystem.Helpers"
-             StartupUri="Views/LoginWindow.xaml">
+             Startup="App_OnStartup">
     <Application.Resources>
         <helpers:StringToVisibilityConverter x:Key="StringToVisibilityConverter"/>
         <helpers:BoolToColorConverter x:Key="BoolToColorConverter"/>
+        <helpers:InverseBoolConverter x:Key="InverseBoolConverter"/>
     </Application.Resources>
 </Application>

@@ -18,6 +18,16 @@ namespace SmartAgricultureSystem
     {
         // 全局服务定位器，负责创建和管理窗口及依赖服务
         public static ServiceLocator ServiceLocator { get; } = new ServiceLocator();
+
+        /// <summary>
+        /// 应用启动时由 App.xaml 的 Startup 事件触发
+        /// 使用 ServiceLocator 创建登录窗口（需要带参构造函数）
+        /// </summary>
+        private void App_OnStartup(object sender, StartupEventArgs e)
+        {
+            var loginWindow = ServiceLocator.GetLoginWindow();
+            loginWindow.Show();
+        }
     }
 
     /// <summary>
@@ -44,7 +54,8 @@ namespace SmartAgricultureSystem
 
         private async void InitializeAsync()
         {
-            await mDatabaseService.InitializeAsync();
+            // 数据库和表需提前在 SQL Server 中通过 Scripts/InitDatabase.sql 创建
+            // 此处仅确保默认管理员账号存在
             await mUserService.InitializeAsync();
         }
 
@@ -71,7 +82,27 @@ namespace SmartAgricultureSystem
         /// </summary>
         public MainWindow GetMainWindow()
         {
-            return new MainWindow();
+            var viewModel = new MainViewModel();
+
+            // 设置当前登录用户信息
+            if (mAuthService?.CurrentUser != null)
+            {
+                viewModel.SetCurrentUser(mAuthService.CurrentUser.username);
+                viewModel.SetAuthService(mAuthService);
+            }
+
+            var window = new MainWindow();
+            window.SetViewModel(viewModel);
+
+            // 设置退出登录回调
+            viewModel.OnLogoutCallback = () =>
+            {
+                var loginWindow = GetLoginWindow();
+                loginWindow.Show();
+                window.Close();
+            };
+
+            return window;
         }
 
         /// <summary>

@@ -1,5 +1,4 @@
-﻿using SQLite;
-using System;
+﻿using System;
 
 namespace SmartAgricultureSystem.Models
 {
@@ -7,15 +6,16 @@ namespace SmartAgricultureSystem.Models
     /// 登录记录模型
     /// 用于安全审计，记录每次登录的时间、IP、结果
     /// </summary>
-    [Table("LoginRecords")]
     public class LoginRecord
     {
         /// <summary>主键，自增ID</summary>
-        [PrimaryKey, AutoIncrement]
         public int id { get; set; }
 
         /// <summary>用户名</summary>
         public string username { get; set; }
+
+        /// <summary>用户ID</summary>
+        public int? userId { get; set; }
 
         /// <summary>登录时间</summary>
         public DateTime loginTime { get; set; } = DateTime.Now;
@@ -26,7 +26,10 @@ namespace SmartAgricultureSystem.Models
         /// <summary>失败原因（成功时为空）</summary>
         public string failReason { get; set; }
 
-        /// <summary>登录设备信息（模拟）</summary>
+        /// <summary>登录IP地址</summary>
+        public string ipAddress { get; set; }
+
+        /// <summary>登录设备信息</summary>
         public string deviceInfo { get; set; } = "Windows PC";
     }
 }
