@@ -5,6 +5,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 
 namespace SmartAgricultureSystem.Services
 {
@@ -77,22 +78,43 @@ namespace SmartAgricultureSystem.Services
         {
             if (IsRunning) return;
 
+            // 先确保之前的资源已释放
+            Stop();
+
             try
             {
+                // NModbus4 的 DataStore 寄存器列表索引从1开始！
+                // HoldingRegisters[0] 无效，HoldingRegisters[1] 对应 Modbus地址40001
+                // 使用 DataStoreFactory.CreateDefaultDataStore() 创建，然后添加足够元素
+                var dataStore = DataStoreFactory.CreateDefaultDataStore();
+
+                // 预填充保持寄存器（索引1~100对应Modbus地址40001~40100）
+                // 索引0会被NModbus忽略（列表占位），索引1开始才是有效地址
+                for (int i = 0; i <= mHoldingRegisters.Length; i++)
+                {
+                    dataStore.HoldingRegisters.Add(0);
+                }
+                // 同样预填充输入寄存器
+                for (int i = 0; i <= mHoldingRegisters.Length; i++)
+                {
+                    dataStore.InputRegisters.Add(0);
+                }
+                // 预填充线圈和离散输入
+                for (int i = 0; i <= mHoldingRegisters.Length; i++)
+                {
+                    dataStore.CoilDiscretes.Add(false);
+                    dataStore.InputDiscretes.Add(false);
+                }
+
                 // 创建TCP监听器，绑定到本机
                 mListener = new TcpListener(IPAddress.Any, mPort);
+                // 设置 SO_REUSEADDR，允许端口在关闭后快速复用
+                mListener.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
                 mListener.Start(1);
 
                 // 创建Modbus TCP从站
                 mSlave = ModbusTcpSlave.CreateTcp(mSlaveId, mListener);
-                mSlave.DataStore = DataStoreFactory.CreateDefaultDataStore();
-
-                // 初始化保持寄存器
-                mSlave.DataStore.HoldingRegisters.Clear();
-                for (int i = 0; i < mHoldingRegisters.Length; i++)
-                {
-                    mSlave.DataStore.HoldingRegisters.Add(mHoldingRegisters[i]);
-                }
+                mSlave.DataStore = dataStore;
 
                 // 写入初始温湿度值
                 UpdateSensorRegisters();
@@ -110,6 +132,8 @@ namespace SmartAgricultureSystem.Services
             catch (Exception ex)
             {
                 Console.WriteLine($"[虚拟从站] 启动失败: {ex.Message}");
+                // 清理部分初始化的资源
+                CleanupResources();
                 throw;
             }
         }
@@ -119,14 +143,43 @@ namespace SmartAgricultureSystem.Services
         /// </summary>
         public void Stop()
         {
-            if (!IsRunning) return;
-
-            mCts?.Cancel();
-            mSlave?.Dispose();
-            mListener?.Stop();
+            if (!IsRunning && mListener == null && mSlave == null)
+                return;
 
             IsRunning = false;
+            CleanupResources();
             Console.WriteLine("[虚拟从站] 已停止");
+        }
+
+        /// <summary>
+        /// 清理底层资源（TcpListener、ModbusSlave等）
+        /// 使用 SO_REUSEADDR 选项确保端口可快速复用
+        /// </summary>
+        private void CleanupResources()
+        {
+            mCts?.Cancel();
+            mCts?.Dispose();
+            mCts = null;
+
+            try
+            {
+                mSlave?.Dispose();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[虚拟从站] Dispose Slave异常: {ex.Message}");
+            }
+            mSlave = null;
+
+            try
+            {
+                mListener?.Stop();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[虚拟从站] Stop Listener异常: {ex.Message}");
+            }
+            mListener = null;
         }
 
         /// <summary>
@@ -141,13 +194,13 @@ namespace SmartAgricultureSystem.Services
                 {
                     await Task.Delay(mUpdateIntervalMs, token);
 
-                    // 温度随机游走（范围 0~50℃）
-                    double tempDelta = (mRandom.NextDouble() - 0.5) * 1.0;
+                    // 温度随机游走（范围 0~50℃），增大波动幅度使曲线更明显
+                    double tempDelta = (mRandom.NextDouble() - 0.5) * 2.0;
                     mCurrentTemp += tempDelta;
                     mCurrentTemp = Math.Max(0, Math.Min(50, mCurrentTemp));
 
-                    // 湿度随机游走（范围 10~99%）
-                    double humDelta = (mRandom.NextDouble() - 0.5) * 2.0;
+                    // 湿度随机游走（范围 10~99%），增大波动幅度使曲线更明显
+                    double humDelta = (mRandom.NextDouble() - 0.5) * 4.0;
                     mCurrentHumidity += humDelta;
                     mCurrentHumidity = Math.Max(10, Math.Min(99, mCurrentHumidity));
 
@@ -170,16 +223,19 @@ namespace SmartAgricultureSystem.Services
         /// <summary>
         /// 将当前温湿度值写入Modbus保持寄存器
         /// 寄存器值 = 实际值 × 10（取整数部分）
+        /// 注意：NModbus4的DataStore寄存器索引从1开始！
+        ///   HoldingRegisters[1] => Modbus地址40001（温度）
+        ///   HoldingRegisters[2] => Modbus地址40002（湿度）
         /// </summary>
         private void UpdateSensorRegisters()
         {
             if (mSlave?.DataStore == null) return;
 
-            // NModbus的DataStore中寄存器索引从0开始
-            // 但DataStore.HoldingRegisters[0]对应Modbus地址1（即40001）
-            // 所以索引0 => 40001(温度), 索引1 => 40002(湿度)
-            mSlave.DataStore.HoldingRegisters[0] = (ushort)(mCurrentTemp * 10);
-            mSlave.DataStore.HoldingRegisters[1] = (ushort)(mCurrentHumidity * 10);
+            // NModbus4的DataStore中寄存器索引从1开始（不是0）
+            // HoldingRegisters[1] 对应 Modbus地址 40001（温度）
+            // HoldingRegisters[2] 对应 Modbus地址 40002（湿度）
+            mSlave.DataStore.HoldingRegisters[1] = (ushort)(mCurrentTemp * 10);
+            mSlave.DataStore.HoldingRegisters[2] = (ushort)(mCurrentHumidity * 10);
         }
 
         /// <summary>

@@ -113,12 +113,24 @@
                            Foreground="White" TextWrapping="Wrap"/>
             </Border>
 
-            <!-- 退出登录 -->
-            <Button Content="🚪 退出登录"
-                    Command="{Binding LogoutCommand}"
-                    Background="#45475A" Foreground="#F38BA8"
-                    FontSize="14" FontWeight="Bold"
-                    Padding="0,12" Cursor="Hand"/>
+            <!-- 返回主界面 + 退出登录 -->
+            <Grid Margin="0,10,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="10"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Button Grid.Column="0" Content="返回主界面"
+                        Click="BtnGoBack_Click"
+                        Background="#89B4FA" Foreground="#1E1E2E"
+                        FontWeight="Bold" FontSize="14"
+                        Padding="0,12" Cursor="Hand"/>
+                <Button Grid.Column="2" Content="退出登录"
+                        Command="{Binding LogoutCommand}"
+                        Background="#45475A" Foreground="#F38BA8"
+                        FontWeight="Bold" FontSize="14"
+                        Padding="0,12" Cursor="Hand"/>
+            </Grid>
 
         </StackPanel>
     </ScrollViewer>

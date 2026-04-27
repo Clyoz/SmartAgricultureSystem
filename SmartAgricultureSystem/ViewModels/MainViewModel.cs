@@ -6,6 +6,7 @@ using SmartAgricultureSystem.Services;
 using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -74,6 +75,9 @@ namespace SmartAgricultureSystem.ViewModels
         // 当前登录用户名
         private string mCurrentUsername;
 
+        // 选中的设备
+        private Device mSelectedDevice;
+
         // 图表时间标签集合
         public ObservableCollection<string> TimeLabels { get; set; }
 
@@ -88,6 +92,9 @@ namespace SmartAgricultureSystem.ViewModels
 
         // 历史数据列表（用于DataGrid展示）
         public ObservableCollection<SensorData> HistoryData { get; set; }
+
+        // 设备列表（从数据库加载）
+        public ObservableCollection<Device> DeviceList { get; set; }
 
         #region 属性绑定
 
@@ -161,6 +168,23 @@ namespace SmartAgricultureSystem.ViewModels
             set { mCurrentUsername = value; OnPropertyChanged(); }
         }
 
+        /// <summary>选中的设备（绑定到UI的ComboBox）</summary>
+        public Device SelectedDevice
+        {
+            get => mSelectedDevice;
+            set
+            {
+                mSelectedDevice = value;
+                OnPropertyChanged();
+                // 选择设备后自动填充IP和端口
+                if (mSelectedDevice != null && !IsVirtualMode)
+                {
+                    DeviceIp = mSelectedDevice.ipAddress ?? "";
+                    DevicePort = mSelectedDevice.port;
+                }
+            }
+        }
+
         #endregion
         #region 命令
 
@@ -182,10 +206,16 @@ namespace SmartAgricultureSystem.ViewModels
         /// <summary>退出登录命令</summary>
         public ICommand LogoutCommand { get; }
 
+        /// <summary>打开个人中心命令</summary>
+        public ICommand OpenProfileCommand { get; }
+
         #endregion
 
         /// <summary>退出登录回调</summary>
         public System.Action OnLogoutCallback { get; set; }
+
+        /// <summary>打开个人中心回调</summary>
+        public System.Action OnOpenProfileCallback { get; set; }
 
         /// <summary>
         /// 构造函数，初始化所有服务和命令
@@ -204,6 +234,10 @@ namespace SmartAgricultureSystem.ViewModels
             mHumidityValues = new ChartValues<double>();
             TimeLabels = new ObservableCollection<string>();
             HistoryData = new ObservableCollection<SensorData>();
+            DeviceList = new ObservableCollection<Device>();
+
+            // 异步加载设备列表
+            LoadDevicesAsync();
 
             // 初始化图表系列
             ChartSeries = new SeriesCollection {
@@ -226,6 +260,7 @@ namespace SmartAgricultureSystem.ViewModels
             StopCollectCommand = new RelayCommand(_ => StopCollecting(), _ => IsRunning);
             ToggleVirtualModeCommand = new RelayCommand(async _ => await ToggleVirtualModeAsync());
             LogoutCommand = new RelayCommand(async _ => await LogoutAsync());
+            OpenProfileCommand = new RelayCommand(_ => OpenProfile());
 
             ConnectionStatus = "未连接";
         }
@@ -239,11 +274,44 @@ namespace SmartAgricultureSystem.ViewModels
         }
 
         /// <summary>
+        /// 异步从数据库加载设备列表
+        /// </summary>
+        private async void LoadDevicesAsync()
+        {
+            try
+            {
+                var devices = await mDatabaseService.GetSensorDevicesAsync();
+                DeviceList.Clear();
+                foreach (var device in devices)
+                {
+                    DeviceList.Add(device);
+                }
+                // 默认选中第一个设备
+                if (DeviceList.Count > 0)
+                {
+                    SelectedDevice = DeviceList[0];
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[设备列表] 加载失败: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// 设置认证服务（用于退出登录）
         /// </summary>
         public void SetAuthService(AuthService authService)
         {
             mAuthService = authService;
+        }
+
+        /// <summary>
+        /// 打开个人中心
+        /// </summary>
+        private void OpenProfile()
+        {
+            OnOpenProfileCallback?.Invoke();
         }
 
         /// <summary>
@@ -270,31 +338,54 @@ namespace SmartAgricultureSystem.ViewModels
         /// </summary>
         private async Task ConnectAsync()
         {
+            // 输入验证
+            if (IsVirtualMode)
+            {
+                // 虚拟模式无需验证IP
+            }
+            else
+            {
+                if (string.IsNullOrWhiteSpace(DeviceIp))
+                {
+                    MessageBox.Show("请输入IP地址！", "提示");
+                    return;
+                }
+                if (DevicePort <= 0 || DevicePort > 65535)
+                {
+                    MessageBox.Show("请输入有效的端口号（1-65535）！", "提示");
+                    return;
+                }
+            }
+
             ConnectionStatus = "连接中...";
 
             if (IsVirtualMode)
             {
-                // 虚拟模式：启动本地从站，连接到127.0.0.1:5020
+                // 虚拟模式：启动本地从站，使用用户输入的端口（默认5020）
+                int virtualPort = DevicePort > 0 ? DevicePort : 5020;
                 try
                 {
-                    mVirtualSlave = new VirtualModbusSlaveService(5020);
+                    mVirtualSlave = new VirtualModbusSlaveService(virtualPort);
                     mVirtualSlave.Start();
-                    mModbusService = new ModbusService("127.0.0.1", 5020);
+                    // 短暂等待从站启动
+                    await Task.Delay(500);
+                    mModbusService = new ModbusService("127.0.0.1", virtualPort);
                     bool success = await mModbusService.ConnectAsync();
                     if (success)
                     {
                         IsConnected = true;
-                        ConnectionStatus = "已连接 (虚拟模式 127.0.0.1:5020)";
-                        // 启动定时读取当前值
+                        ConnectionStatus = $"已连接 (虚拟模式 127.0.0.1:{virtualPort})";
                         StartReadingCurrentValues();
                     }
                     else
                     {
+                        mVirtualSlave.Stop();
                         ConnectionStatus = "虚拟模式连接失败";
                     }
                 }
                 catch (Exception ex)
                 {
+                    mVirtualSlave?.Stop();
                     ConnectionStatus = $"虚拟模式启动失败: {ex.Message}";
                 }
             }
@@ -303,18 +394,26 @@ namespace SmartAgricultureSystem.ViewModels
                 // 真实设备模式
                 try
                 {
-                    mModbusService = new ModbusService(DeviceIp, DevicePort);
+                    // 使用选中设备的slaveId，如果未选中则默认1
+                    byte slaveId = SelectedDevice?.slaveId ?? (byte)1;
+                    mModbusService = new ModbusService(DeviceIp, DevicePort, slaveId);
                     bool success = await mModbusService.ConnectAsync();
                     if (success)
                     {
                         IsConnected = true;
                         ConnectionStatus = $"已连接 ({DeviceIp}:{DevicePort})";
-                        // 启动定时读取当前值
                         StartReadingCurrentValues();
+
+                        // 更新设备在线状态
+                        if (SelectedDevice != null)
+                        {
+                            try { await mDatabaseService.UpdateDeviceOnlineStatusAsync(SelectedDevice.id, true); }
+                            catch { /* 忽略数据库更新失败 */ }
+                        }
                     }
                     else
                     {
-                        ConnectionStatus = "连接失败";
+                        ConnectionStatus = "连接失败，请检查IP地址和端口号";
                     }
                 }
                 catch (Exception ex)
@@ -385,12 +484,19 @@ namespace SmartAgricultureSystem.ViewModels
             mModbusService?.Dispose();
             mVirtualSlave?.Stop();
 
+            // 更新设备离线状态
+            if (SelectedDevice != null && !IsVirtualMode)
+            {
+                try { mDatabaseService.UpdateDeviceOnlineStatusAsync(SelectedDevice.id, false).Wait(); }
+                catch { /* 忽略 */ }
+            }
+
             IsConnected = false;
             ConnectionStatus = "未连接";
 
-            // 清空IP地址和端口号
+            // 清空IP地址和端口号（虚拟模式保留默认端口）
             DeviceIp = string.Empty;
-            DevicePort = 0;
+            DevicePort = IsVirtualMode ? 5020 : 0;
 
             // 重置当前温湿度显示
             CurrentTemperature = 0;
@@ -522,8 +628,21 @@ namespace SmartAgricultureSystem.ViewModels
             else
             {
                 ConnectionStatus = "未连接";
-                DeviceIp = "192.168.1.100";
-                DevicePort = 502;
+                // 恢复选中设备的IP和端口
+                if (SelectedDevice != null)
+                {
+                    DeviceIp = SelectedDevice.ipAddress ?? "192.168.1.100";
+                    DevicePort = SelectedDevice.port;
+                }
+                else if (DeviceList.Count > 0)
+                {
+                    SelectedDevice = DeviceList[0];
+                }
+                else
+                {
+                    DeviceIp = "192.168.1.100";
+                    DevicePort = 502;
+                }
             }
 
             await Task.CompletedTask;

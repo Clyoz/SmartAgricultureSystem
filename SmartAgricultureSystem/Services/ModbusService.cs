@@ -8,9 +8,14 @@ namespace SmartAgricultureSystem.Services
     /// <summary>
     /// Modbus TCP 通讯服务
     /// 负责与传感器设备进行数据交互
-    /// 寄存器地址约定：
-    ///   40001 (0x0000) => 温度值 × 10（整数）
-    ///   40002 (0x0001) => 湿度值 × 10（整数）
+    /// 寄存器地址约定（Modbus协议地址，从0开始）：
+    ///   地址0 (40001) => 温度值 × 10（整数）
+    ///   地址1 (40002) => 湿度值 × 10（整数）
+    /// 
+    /// 注意：NModbus4 的 ReadHoldingRegistersAsync 使用 Modbus协议地址（从0开始），
+    ///   协议地址0 对应 DataStore.HoldingRegisters[1]（DataStore索引从1开始）
+    ///   协议地址1 对应 DataStore.HoldingRegisters[2]
+    ///   两者之间偏移量为1
     /// </summary>
     public class ModbusService : IDisposable
     {
@@ -85,16 +90,15 @@ namespace SmartAgricultureSystem.Services
 
         /// <summary>
         /// 异步读取温度值
-        /// 读取保持寄存器地址 0x0000，返回实际温度（除以10）
+        /// 读取保持寄存器协议地址0（对应Modbus地址40001），返回实际温度（除以10）
         /// </summary>
         /// <returns>温度值（℃），失败返回 double.NaN</returns>
         public async Task<double> ReadTemperatureAsync()
         {
             try
             {
-                // 读取1个保持寄存器，起始地址0x0000
-                ushort[] registers = await Task.Run(() =>
-                    mMaster.ReadHoldingRegisters(mSlaveId, 0x0000, 1));
+                // 协议地址0 => DataStore.HoldingRegisters[1] => 40001(温度)
+                ushort[] registers = await mMaster.ReadHoldingRegistersAsync(mSlaveId, 0, 1);
                 return registers[0] / 10.0;
             }
             catch (Exception ex)
@@ -106,16 +110,15 @@ namespace SmartAgricultureSystem.Services
 
         /// <summary>
         /// 异步读取湿度值
-        /// 读取保持寄存器地址 0x0001，返回实际湿度（除以10）
+        /// 读取保持寄存器协议地址1（对应Modbus地址40002），返回实际湿度（除以10）
         /// </summary>
         /// <returns>湿度值（%RH），失败返回 double.NaN</returns>
         public async Task<double> ReadHumidityAsync()
         {
             try
             {
-                // 读取1个保持寄存器，起始地址0x0001
-                ushort[] registers = await Task.Run(() =>
-                    mMaster.ReadHoldingRegisters(mSlaveId, 0x0001, 1));
+                // 协议地址1 => DataStore.HoldingRegisters[2] => 40002(湿度)
+                ushort[] registers = await mMaster.ReadHoldingRegistersAsync(mSlaveId, 1, 1);
                 return registers[0] / 10.0;
             }
             catch (Exception ex)
@@ -127,15 +130,15 @@ namespace SmartAgricultureSystem.Services
 
         /// <summary>
         /// 同时读取温度和湿度（一次性读取2个寄存器，减少通讯次数）
+        /// 从协议地址0开始连续读取2个寄存器
         /// </summary>
         /// <returns>温湿度元组 (温度, 湿度)</returns>
         public async Task<(double temperature, double humidity)> ReadTempHumidityAsync()
         {
             try
             {
-                // 从地址0x0000开始，连续读取2个寄存器
-                ushort[] registers = await Task.Run(() =>
-                    mMaster.ReadHoldingRegisters(mSlaveId, 0x0000, 2));
+                // 协议地址0 => DataStore[1]=40001(温度), 协议地址1 => DataStore[2]=40002(湿度)
+                ushort[] registers = await mMaster.ReadHoldingRegistersAsync(mSlaveId, 0, 2);
                 double temperature = registers[0] / 10.0;
                 double humidity = registers[1] / 10.0;
                 return (temperature, humidity);

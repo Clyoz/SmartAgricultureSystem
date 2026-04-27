@@ -33,6 +33,15 @@ namespace SmartAgricultureSystem.Views
         }
 
         /// <summary>
+        /// 返回主界面按钮点击事件
+        /// 关闭个人信息窗口，返回主界面
+        /// </summary>
+        private void BtnGoBack_Click(object sender, RoutedEventArgs e)
+        {
+            this.Close();
+        }
+
+        /// <summary>
         /// 设置ViewModel（由ServiceLocator调用）
         /// </summary>
         public void SetViewModel(ProfileViewModel viewModel)

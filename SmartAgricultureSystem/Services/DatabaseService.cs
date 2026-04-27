@@ -335,6 +335,77 @@ ELSE
 
         #endregion
 
+        #region 设备操作
+
+        /// <summary>
+        /// 查询所有传感器节点设备（deviceType=2）
+        /// </summary>
+        public async Task<List<Device>> GetSensorDevicesAsync()
+        {
+            var result = new List<Device>();
+            using (var conn = CreateConnection())
+            {
+                await conn.OpenAsync();
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"
+SELECT id, deviceCode, name, greenhouseId, deviceType, ipAddress, port, slaveId, 
+    model, firmwareVersion, isOnline, lastOnlineTime, installDate, remark, createdAt, updatedAt
+FROM Devices 
+WHERE deviceType = 2
+ORDER BY id";
+                    using (var reader = await cmd.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            result.Add(new Device
+                            {
+                                id = (int)reader["id"],
+                                deviceCode = reader["deviceCode"]?.ToString(),
+                                name = reader["name"]?.ToString(),
+                                greenhouseId = (int)reader["greenhouseId"],
+                                deviceType = (int)reader["deviceType"],
+                                ipAddress = reader["ipAddress"]?.ToString(),
+                                port = (int)reader["port"],
+                                slaveId = (byte)reader["slaveId"],
+                                model = reader["model"]?.ToString(),
+                                firmwareVersion = reader["firmwareVersion"]?.ToString(),
+                                isOnline = (bool)reader["isOnline"],
+                                lastOnlineTime = reader["lastOnlineTime"] == DBNull.Value ? (DateTime?)null : (DateTime)reader["lastOnlineTime"],
+                                installDate = reader["installDate"] == DBNull.Value ? (DateTime?)null : (DateTime)reader["installDate"],
+                                remark = reader["remark"]?.ToString(),
+                                createdAt = (DateTime)reader["createdAt"],
+                                updatedAt = reader["updatedAt"] == DBNull.Value ? (DateTime?)null : (DateTime)reader["updatedAt"]
+                            });
+                        }
+                    }
+                }
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// 更新设备在线状态
+        /// </summary>
+        public async Task UpdateDeviceOnlineStatusAsync(int deviceId, bool isOnline)
+        {
+            using (var conn = CreateConnection())
+            {
+                await conn.OpenAsync();
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"
+UPDATE Devices SET isOnline = @isOnline, lastOnlineTime = CASE WHEN @isOnline=1 THEN GETDATE() ELSE lastOnlineTime END, updatedAt = GETDATE()
+WHERE id = @id";
+                    AddParameter(cmd, "@isOnline", isOnline);
+                    AddParameter(cmd, "@id", deviceId);
+                    await cmd.ExecuteNonQueryAsync();
+                }
+            }
+        }
+
+        #endregion
+
         #region 通用辅助方法
 
         /// <summary>

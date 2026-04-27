@@ -102,24 +102,36 @@ namespace SmartAgricultureSystem
                 window.Close();
             };
 
+            // 设置打开个人中心回调
+            viewModel.OnOpenProfileCallback = () =>
+            {
+                var profileWindow = GetProfileWindow(window);
+                profileWindow.Owner = window;
+                profileWindow.ShowDialog();
+            };
+
             return window;
         }
 
         /// <summary>
         /// 获取个人信息窗口
         /// </summary>
-        public ProfileWindow GetProfileWindow()
+        public ProfileWindow GetProfileWindow(Window mainWindow = null)
         {
             var viewModel = new ProfileViewModel(mUserService, mAuthService);
             var window = new ProfileWindow();
             window.SetViewModel(viewModel);
 
-            // 设置退出登录回调
+            // 设置退出登录回调：退出登录后回到登录页面
             viewModel.OnLogoutCallback = () =>
             {
+                window.Close();
+                if (mainWindow != null)
+                {
+                    mainWindow.Close();
+                }
                 var loginWindow = GetLoginWindow();
                 loginWindow.Show();
-                Window.GetWindow(window)?.Close();
             };
 
             return window;
