@@ -406,6 +406,467 @@ WHERE id = @id";
 
         #endregion
 
+        #region 蔬菜管理操作
+
+        /// <summary>
+        /// 获取所有作物信息
+        /// </summary>
+        public async Task<List<CropInfo>> GetAllCropsAsync()
+        {
+            var result = new List<CropInfo>();
+            using (var conn = CreateConnection())
+            {
+                await conn.OpenAsync();
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = "SELECT * FROM CropInfo ORDER BY id";
+                    using (var reader = await cmd.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            result.Add(new CropInfo
+                            {
+                                id = (int)reader["id"],
+                                cropName = reader["cropName"]?.ToString(),
+                                variety = reader["variety"]?.ToString(),
+                                tempMin = Convert.ToDouble(reader["tempMin"]),
+                                tempMax = Convert.ToDouble(reader["tempMax"]),
+                                humidityMin = Convert.ToDouble(reader["humidityMin"]),
+                                humidityMax = Convert.ToDouble(reader["humidityMax"]),
+                                lightMin = reader["lightMin"] == DBNull.Value ? (double?)null : Convert.ToDouble(reader["lightMin"]),
+                                lightMax = reader["lightMax"] == DBNull.Value ? (double?)null : Convert.ToDouble(reader["lightMax"]),
+                                growthCycleDays = (int)reader["growthCycleDays"],
+                                description = reader["description"]?.ToString(),
+                                createdAt = (DateTime)reader["createdAt"]
+                            });
+                        }
+                    }
+                }
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// 添加作物信息
+        /// </summary>
+        public async Task<int> AddCropAsync(CropInfo crop)
+        {
+            using (var conn = CreateConnection())
+            {
+                await conn.OpenAsync();
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"
+INSERT INTO CropInfo (cropName, variety, tempMin, tempMax, humidityMin, humidityMax, lightMin, lightMax, growthCycleDays, description)
+VALUES (@cropName, @variety, @tempMin, @tempMax, @humidityMin, @humidityMax, @lightMin, @lightMax, @growthCycleDays, @description);
+SELECT SCOPE_IDENTITY();";
+                    AddParameter(cmd, "@cropName", crop.cropName);
+                    AddParameter(cmd, "@variety", (object)crop.variety ?? DBNull.Value);
+                    AddParameter(cmd, "@tempMin", crop.tempMin);
+                    AddParameter(cmd, "@tempMax", crop.tempMax);
+                    AddParameter(cmd, "@humidityMin", crop.humidityMin);
+                    AddParameter(cmd, "@humidityMax", crop.humidityMax);
+                    AddParameter(cmd, "@lightMin", (object)crop.lightMin ?? DBNull.Value);
+                    AddParameter(cmd, "@lightMax", (object)crop.lightMax ?? DBNull.Value);
+                    AddParameter(cmd, "@growthCycleDays", crop.growthCycleDays);
+                    AddParameter(cmd, "@description", (object)crop.description ?? DBNull.Value);
+                    return Convert.ToInt32(await cmd.ExecuteScalarAsync());
+                }
+            }
+        }
+
+        /// <summary>
+        /// 更新作物信息
+        /// </summary>
+        public async Task UpdateCropAsync(CropInfo crop)
+        {
+            using (var conn = CreateConnection())
+            {
+                await conn.OpenAsync();
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"
+UPDATE CropInfo SET cropName=@cropName, variety=@variety, tempMin=@tempMin, tempMax=@tempMax,
+    humidityMin=@humidityMin, humidityMax=@humidityMax, lightMin=@lightMin, lightMax=@lightMax,
+    growthCycleDays=@growthCycleDays, description=@description
+WHERE id=@id";
+                    AddParameter(cmd, "@cropName", crop.cropName);
+                    AddParameter(cmd, "@variety", (object)crop.variety ?? DBNull.Value);
+                    AddParameter(cmd, "@tempMin", crop.tempMin);
+                    AddParameter(cmd, "@tempMax", crop.tempMax);
+                    AddParameter(cmd, "@humidityMin", crop.humidityMin);
+                    AddParameter(cmd, "@humidityMax", crop.humidityMax);
+                    AddParameter(cmd, "@lightMin", (object)crop.lightMin ?? DBNull.Value);
+                    AddParameter(cmd, "@lightMax", (object)crop.lightMax ?? DBNull.Value);
+                    AddParameter(cmd, "@growthCycleDays", crop.growthCycleDays);
+                    AddParameter(cmd, "@description", (object)crop.description ?? DBNull.Value);
+                    AddParameter(cmd, "@id", crop.id);
+                    await cmd.ExecuteNonQueryAsync();
+                }
+            }
+        }
+
+        /// <summary>
+        /// 删除作物信息
+        /// </summary>
+        public async Task DeleteCropAsync(int cropId)
+        {
+            using (var conn = CreateConnection())
+            {
+                await conn.OpenAsync();
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = "DELETE FROM CropInfo WHERE id=@id";
+                    AddParameter(cmd, "@id", cropId);
+                    await cmd.ExecuteNonQueryAsync();
+                }
+            }
+        }
+
+        #endregion
+
+        #region 大棚管理操作
+
+        /// <summary>
+        /// 获取所有大棚
+        /// </summary>
+        public async Task<List<Greenhouse>> GetAllGreenhousesAsync()
+        {
+            var result = new List<Greenhouse>();
+            using (var conn = CreateConnection())
+            {
+                await conn.OpenAsync();
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = "SELECT * FROM Greenhouses ORDER BY id";
+                    using (var reader = await cmd.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            result.Add(new Greenhouse
+                            {
+                                id = (int)reader["id"],
+                                greenhouseCode = reader["greenhouseCode"]?.ToString(),
+                                name = reader["name"]?.ToString(),
+                                location = reader["location"]?.ToString(),
+                                area = reader["area"] == DBNull.Value ? 0 : Convert.ToDouble(reader["area"]),
+                                greenhouseType = reader["greenhouseType"]?.ToString(),
+                                managerId = reader["managerId"] == DBNull.Value ? (int?)null : (int)reader["managerId"],
+                                buildDate = reader["buildDate"] == DBNull.Value ? (DateTime?)null : (DateTime)reader["buildDate"],
+                                status = (int)reader["status"],
+                                remark = reader["remark"]?.ToString(),
+                                createdAt = (DateTime)reader["createdAt"],
+                                updatedAt = reader["updatedAt"] == DBNull.Value ? (DateTime?)null : (DateTime)reader["updatedAt"]
+                            });
+                        }
+                    }
+                }
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// 添加大棚
+        /// </summary>
+        public async Task<int> AddGreenhouseAsync(Greenhouse gh)
+        {
+            using (var conn = CreateConnection())
+            {
+                await conn.OpenAsync();
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"
+INSERT INTO Greenhouses (greenhouseCode, name, location, area, greenhouseType, managerId, buildDate, status, remark)
+VALUES (@greenhouseCode, @name, @location, @area, @greenhouseType, @managerId, @buildDate, @status, @remark);
+SELECT SCOPE_IDENTITY();";
+                    AddParameter(cmd, "@greenhouseCode", gh.greenhouseCode);
+                    AddParameter(cmd, "@name", gh.name);
+                    AddParameter(cmd, "@location", (object)gh.location ?? DBNull.Value);
+                    AddParameter(cmd, "@area", gh.area);
+                    AddParameter(cmd, "@greenhouseType", (object)gh.greenhouseType ?? DBNull.Value);
+                    AddParameter(cmd, "@managerId", (object)gh.managerId ?? DBNull.Value);
+                    AddParameter(cmd, "@buildDate", (object)gh.buildDate ?? DBNull.Value);
+                    AddParameter(cmd, "@status", gh.status);
+                    AddParameter(cmd, "@remark", (object)gh.remark ?? DBNull.Value);
+                    return Convert.ToInt32(await cmd.ExecuteScalarAsync());
+                }
+            }
+        }
+
+        /// <summary>
+        /// 更新大棚
+        /// </summary>
+        public async Task UpdateGreenhouseAsync(Greenhouse gh)
+        {
+            using (var conn = CreateConnection())
+            {
+                await conn.OpenAsync();
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"
+UPDATE Greenhouses SET greenhouseCode=@greenhouseCode, name=@name, location=@location, area=@area,
+    greenhouseType=@greenhouseType, managerId=@managerId, buildDate=@buildDate, status=@status,
+    remark=@remark, updatedAt=GETDATE()
+WHERE id=@id";
+                    AddParameter(cmd, "@greenhouseCode", gh.greenhouseCode);
+                    AddParameter(cmd, "@name", gh.name);
+                    AddParameter(cmd, "@location", (object)gh.location ?? DBNull.Value);
+                    AddParameter(cmd, "@area", gh.area);
+                    AddParameter(cmd, "@greenhouseType", (object)gh.greenhouseType ?? DBNull.Value);
+                    AddParameter(cmd, "@managerId", (object)gh.managerId ?? DBNull.Value);
+                    AddParameter(cmd, "@buildDate", (object)gh.buildDate ?? DBNull.Value);
+                    AddParameter(cmd, "@status", gh.status);
+                    AddParameter(cmd, "@remark", (object)gh.remark ?? DBNull.Value);
+                    AddParameter(cmd, "@id", gh.id);
+                    await cmd.ExecuteNonQueryAsync();
+                }
+            }
+        }
+
+        /// <summary>
+        /// 删除大棚
+        /// </summary>
+        public async Task DeleteGreenhouseAsync(int greenhouseId)
+        {
+            using (var conn = CreateConnection())
+            {
+                await conn.OpenAsync();
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = "DELETE FROM Greenhouses WHERE id=@id";
+                    AddParameter(cmd, "@id", greenhouseId);
+                    await cmd.ExecuteNonQueryAsync();
+                }
+            }
+        }
+
+        #endregion
+
+        #region 设备管理操作
+
+        /// <summary>
+        /// 获取所有设备
+        /// </summary>
+        public async Task<List<Device>> GetAllDevicesAsync()
+        {
+            var result = new List<Device>();
+            using (var conn = CreateConnection())
+            {
+                await conn.OpenAsync();
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = "SELECT * FROM Devices ORDER BY id";
+                    using (var reader = await cmd.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            result.Add(new Device
+                            {
+                                id = (int)reader["id"],
+                                deviceCode = reader["deviceCode"]?.ToString(),
+                                name = reader["name"]?.ToString(),
+                                greenhouseId = (int)reader["greenhouseId"],
+                                deviceType = (int)reader["deviceType"],
+                                ipAddress = reader["ipAddress"]?.ToString(),
+                                port = (int)reader["port"],
+                                slaveId = (byte)reader["slaveId"],
+                                model = reader["model"]?.ToString(),
+                                firmwareVersion = reader["firmwareVersion"]?.ToString(),
+                                isOnline = (bool)reader["isOnline"],
+                                lastOnlineTime = reader["lastOnlineTime"] == DBNull.Value ? (DateTime?)null : (DateTime)reader["lastOnlineTime"],
+                                installDate = reader["installDate"] == DBNull.Value ? (DateTime?)null : (DateTime)reader["installDate"],
+                                remark = reader["remark"]?.ToString(),
+                                createdAt = (DateTime)reader["createdAt"],
+                                updatedAt = reader["updatedAt"] == DBNull.Value ? (DateTime?)null : (DateTime)reader["updatedAt"]
+                            });
+                        }
+                    }
+                }
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// 添加设备
+        /// </summary>
+        public async Task<int> AddDeviceAsync(Device device)
+        {
+            using (var conn = CreateConnection())
+            {
+                await conn.OpenAsync();
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"
+INSERT INTO Devices (deviceCode, name, greenhouseId, deviceType, ipAddress, port, slaveId, model, firmwareVersion, isOnline, installDate, remark)
+VALUES (@deviceCode, @name, @greenhouseId, @deviceType, @ipAddress, @port, @slaveId, @model, @firmwareVersion, @isOnline, @installDate, @remark);
+SELECT SCOPE_IDENTITY();";
+                    AddParameter(cmd, "@deviceCode", device.deviceCode);
+                    AddParameter(cmd, "@name", device.name);
+                    AddParameter(cmd, "@greenhouseId", device.greenhouseId);
+                    AddParameter(cmd, "@deviceType", device.deviceType);
+                    AddParameter(cmd, "@ipAddress", (object)device.ipAddress ?? DBNull.Value);
+                    AddParameter(cmd, "@port", device.port);
+                    AddParameter(cmd, "@slaveId", device.slaveId);
+                    AddParameter(cmd, "@model", (object)device.model ?? DBNull.Value);
+                    AddParameter(cmd, "@firmwareVersion", (object)device.firmwareVersion ?? DBNull.Value);
+                    AddParameter(cmd, "@isOnline", device.isOnline);
+                    AddParameter(cmd, "@installDate", (object)device.installDate ?? DBNull.Value);
+                    AddParameter(cmd, "@remark", (object)device.remark ?? DBNull.Value);
+                    return Convert.ToInt32(await cmd.ExecuteScalarAsync());
+                }
+            }
+        }
+
+        /// <summary>
+        /// 更新设备
+        /// </summary>
+        public async Task UpdateDeviceAsync(Device device)
+        {
+            using (var conn = CreateConnection())
+            {
+                await conn.OpenAsync();
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"
+UPDATE Devices SET deviceCode=@deviceCode, name=@name, greenhouseId=@greenhouseId, deviceType=@deviceType,
+    ipAddress=@ipAddress, port=@port, slaveId=@slaveId, model=@model, firmwareVersion=@firmwareVersion,
+    installDate=@installDate, remark=@remark, updatedAt=GETDATE()
+WHERE id=@id";
+                    AddParameter(cmd, "@deviceCode", device.deviceCode);
+                    AddParameter(cmd, "@name", device.name);
+                    AddParameter(cmd, "@greenhouseId", device.greenhouseId);
+                    AddParameter(cmd, "@deviceType", device.deviceType);
+                    AddParameter(cmd, "@ipAddress", (object)device.ipAddress ?? DBNull.Value);
+                    AddParameter(cmd, "@port", device.port);
+                    AddParameter(cmd, "@slaveId", device.slaveId);
+                    AddParameter(cmd, "@model", (object)device.model ?? DBNull.Value);
+                    AddParameter(cmd, "@firmwareVersion", (object)device.firmwareVersion ?? DBNull.Value);
+                    AddParameter(cmd, "@installDate", (object)device.installDate ?? DBNull.Value);
+                    AddParameter(cmd, "@remark", (object)device.remark ?? DBNull.Value);
+                    AddParameter(cmd, "@id", device.id);
+                    await cmd.ExecuteNonQueryAsync();
+                }
+            }
+        }
+
+        /// <summary>
+        /// 删除设备
+        /// </summary>
+        public async Task DeleteDeviceAsync(int deviceId)
+        {
+            using (var conn = CreateConnection())
+            {
+                await conn.OpenAsync();
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = "DELETE FROM Devices WHERE id=@id";
+                    AddParameter(cmd, "@id", deviceId);
+                    await cmd.ExecuteNonQueryAsync();
+                }
+            }
+        }
+
+        #endregion
+
+        #region 人员管理与登录日志操作
+
+        /// <summary>
+        /// 更新用户信息（昵称、角色、手机、邮箱）
+        /// </summary>
+        public async Task UpdateUserAsync(int userId, string nickname, UserRole role, string phone, string email)
+        {
+            using (var conn = CreateConnection())
+            {
+                await conn.OpenAsync();
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"
+UPDATE Users SET nickname=@nickname, role=@role, phoneNumber=@phone, email=@email WHERE id=@id";
+                    AddParameter(cmd, "@nickname", (object)nickname ?? DBNull.Value);
+                    AddParameter(cmd, "@role", (int)role);
+                    AddParameter(cmd, "@phone", (object)phone ?? DBNull.Value);
+                    AddParameter(cmd, "@email", (object)email ?? DBNull.Value);
+                    AddParameter(cmd, "@id", userId);
+                    await cmd.ExecuteNonQueryAsync();
+                }
+            }
+        }
+
+        /// <summary>
+        /// 删除用户
+        /// </summary>
+        public async Task DeleteUserAsync(int userId)
+        {
+            using (var conn = CreateConnection())
+            {
+                await conn.OpenAsync();
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = "DELETE FROM Users WHERE id=@id";
+                    AddParameter(cmd, "@id", userId);
+                    await cmd.ExecuteNonQueryAsync();
+                }
+            }
+        }
+
+        /// <summary>
+        /// 重置用户密码
+        /// </summary>
+        public async Task ResetUserPasswordAsync(int userId, string passwordHash, string passwordSalt)
+        {
+            using (var conn = CreateConnection())
+            {
+                await conn.OpenAsync();
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = "UPDATE Users SET passwordHash=@hash, passwordSalt=@salt, isLocked=0, failedLoginCount=0, lockUntil=NULL WHERE id=@id";
+                    AddParameter(cmd, "@hash", passwordHash);
+                    AddParameter(cmd, "@salt", passwordSalt);
+                    AddParameter(cmd, "@id", userId);
+                    await cmd.ExecuteNonQueryAsync();
+                }
+            }
+        }
+
+        /// <summary>
+        /// 获取最近N条登录记录
+        /// </summary>
+        public async Task<List<LoginRecord>> GetRecentLoginRecordsAsync(int count = 50)
+        {
+            var result = new List<LoginRecord>();
+            using (var conn = CreateConnection())
+            {
+                await conn.OpenAsync();
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"
+SELECT TOP (@count) id, username, userId, loginTime, isSuccess, failReason, ipAddress, deviceInfo
+FROM LoginRecords ORDER BY loginTime DESC";
+                    AddParameter(cmd, "@count", count);
+                    using (var reader = await cmd.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            result.Add(new LoginRecord
+                            {
+                                id = (int)reader["id"],
+                                username = reader["username"]?.ToString(),
+                                userId = reader["userId"] == DBNull.Value ? (int?)null : (int)reader["userId"],
+                                loginTime = (DateTime)reader["loginTime"],
+                                isSuccess = (bool)reader["isSuccess"],
+                                failReason = reader["failReason"]?.ToString(),
+                                ipAddress = reader["ipAddress"]?.ToString(),
+                                deviceInfo = reader["deviceInfo"]?.ToString()
+                            });
+                        }
+                    }
+                }
+            }
+            return result;
+        }
+
+        #endregion
+
         #region 通用辅助方法
 
         /// <summary>

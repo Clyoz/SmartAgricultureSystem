@@ -441,6 +441,106 @@ VALUES (@username, GETDATE(), @isSuccess, @failReason)";
             }
         }
 
+        /// <summary>
+        /// 删除用户
+        /// </summary>
+        public async Task DeleteUserAsync(int userId)
+        {
+            using (var conn = CreateConnection())
+            {
+                await conn.OpenAsync();
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = "DELETE FROM Users WHERE id = @id";
+                    cmd.Parameters.AddWithValue("@id", userId);
+                    await cmd.ExecuteNonQueryAsync();
+                }
+            }
+        }
+
+        /// <summary>
+        /// 管理员更新用户信息（角色、锁定状态、昵称、备注）
+        /// </summary>
+        public async Task UpdateUserByAdminAsync(int userId, UserRole role, bool isLocked, string nickname, string email, string remark)
+        {
+            using (var conn = CreateConnection())
+            {
+                await conn.OpenAsync();
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"UPDATE Users SET role = @role, isLocked = @isLocked, 
+                        nickname = @nickname, email = @email, remark = @remark WHERE id = @id";
+                    cmd.Parameters.AddWithValue("@role", (int)role);
+                    cmd.Parameters.AddWithValue("@isLocked", isLocked);
+                    cmd.Parameters.AddWithValue("@nickname", (object)nickname ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@email", (object)email ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@remark", (object)remark ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@id", userId);
+                    await cmd.ExecuteNonQueryAsync();
+                }
+            }
+        }
+
+        /// <summary>
+        /// 管理员重置用户密码
+        /// </summary>
+        public async Task ResetPasswordAsync(int userId, string newPassword)
+        {
+            string pwdError = PasswordHelper.ValidatePasswordStrength(newPassword);
+            if (pwdError != null) throw new ArgumentException(pwdError);
+
+            string salt = PasswordHelper.GenerateSalt();
+            using (var conn = CreateConnection())
+            {
+                await conn.OpenAsync();
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = "UPDATE Users SET passwordHash = @hash, passwordSalt = @salt WHERE id = @id";
+                    cmd.Parameters.AddWithValue("@hash", PasswordHelper.HashPassword(newPassword, salt));
+                    cmd.Parameters.AddWithValue("@salt", salt);
+                    cmd.Parameters.AddWithValue("@id", userId);
+                    await cmd.ExecuteNonQueryAsync();
+                }
+            }
+        }
+
+        /// <summary>
+        /// 获取最近的登录日志
+        /// </summary>
+        public async Task<List<LoginRecord>> GetRecentLoginRecordsAsync(int count = 50)
+        {
+            var result = new List<LoginRecord>();
+            using (var conn = CreateConnection())
+            {
+                await conn.OpenAsync();
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"
+SELECT TOP (@count) id, username, userId, loginTime, isSuccess, failReason, ipAddress, deviceInfo
+FROM LoginRecords ORDER BY loginTime DESC";
+                    cmd.Parameters.AddWithValue("@count", count);
+                    using (var reader = await cmd.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            result.Add(new LoginRecord
+                            {
+                                id = (int)reader["id"],
+                                username = reader["username"]?.ToString(),
+                                userId = reader["userId"] == DBNull.Value ? (int?)null : (int)reader["userId"],
+                                loginTime = (DateTime)reader["loginTime"],
+                                isSuccess = (bool)reader["isSuccess"],
+                                failReason = reader["failReason"]?.ToString(),
+                                ipAddress = reader["ipAddress"]?.ToString(),
+                                deviceInfo = reader["deviceInfo"]?.ToString()
+                            });
+                        }
+                    }
+                }
+            }
+            return result;
+        }
+
         #region 辅助方法
 
         private SqlConnection CreateConnection()

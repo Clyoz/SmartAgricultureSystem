@@ -8,5 +8,7 @@
         <helpers:StringToVisibilityConverter x:Key="StringToVisibilityConverter"/>
         <helpers:BoolToColorConverter x:Key="BoolToColorConverter"/>
         <helpers:InverseBoolConverter x:Key="InverseBoolConverter"/>
+        <helpers:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+        <helpers:NavIndexToVisibilityConverter x:Key="NavIndexToVisibilityConverter"/>
     </Application.Resources>
 </Application>

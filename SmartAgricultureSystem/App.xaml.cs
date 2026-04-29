@@ -87,7 +87,7 @@ namespace SmartAgricultureSystem
             // 设置当前登录用户信息
             if (mAuthService?.CurrentUser != null)
             {
-                viewModel.SetCurrentUser(mAuthService.CurrentUser.username);
+                viewModel.SetCurrentUser(mAuthService.CurrentUser.username, mAuthService.CurrentUser.role);
                 viewModel.SetAuthService(mAuthService);
             }
 

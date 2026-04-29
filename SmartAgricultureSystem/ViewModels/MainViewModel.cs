@@ -75,8 +75,26 @@ namespace SmartAgricultureSystem.ViewModels
         // 当前登录用户名
         private string mCurrentUsername;
 
+        // 当前用户角色
+        private UserRole mCurrentUserRole;
+
+        // 选中的导航项
+        private int mSelectedNavIndex = -1;
+
         // 选中的设备
         private Device mSelectedDevice;
+
+        // 人员管理ViewModel（仅管理员使用）
+        private UserManagementViewModel mUserManagementVM;
+
+        // 蔬菜管理ViewModel
+        private CropManagementViewModel mCropManagementVM;
+
+        // 大棚管理ViewModel
+        private GreenhouseManagementViewModel mGreenhouseManagementVM;
+
+        // 设备管理ViewModel
+        private DeviceManagementViewModel mDeviceManagementVM;
 
         // 图表时间标签集合
         public ObservableCollection<string> TimeLabels { get; set; }
@@ -168,6 +186,51 @@ namespace SmartAgricultureSystem.ViewModels
             set { mCurrentUsername = value; OnPropertyChanged(); }
         }
 
+        /// <summary>当前用户角色（绑定到UI）</summary>
+        public UserRole CurrentUserRole
+        {
+            get => mCurrentUserRole;
+            set { mCurrentUserRole = value; OnPropertyChanged(); OnPropertyChanged(nameof(IsAdmin)); }
+        }
+
+        /// <summary>是否为管理员（绑定到UI）</summary>
+        public bool IsAdmin => CurrentUserRole == UserRole.Admin;
+
+        /// <summary>选中的导航项索引</summary>
+        public int SelectedNavIndex
+        {
+            get => mSelectedNavIndex;
+            set { mSelectedNavIndex = value; OnPropertyChanged(); }
+        }
+
+        /// <summary>人员管理ViewModel（仅管理员）</summary>
+        public UserManagementViewModel UserManagementVM
+        {
+            get => mUserManagementVM;
+            set { mUserManagementVM = value; OnPropertyChanged(); }
+        }
+
+        /// <summary>蔬菜管理ViewModel</summary>
+        public CropManagementViewModel CropManagementVM
+        {
+            get => mCropManagementVM;
+            set { mCropManagementVM = value; OnPropertyChanged(); }
+        }
+
+        /// <summary>大棚管理ViewModel</summary>
+        public GreenhouseManagementViewModel GreenhouseManagementVM
+        {
+            get => mGreenhouseManagementVM;
+            set { mGreenhouseManagementVM = value; OnPropertyChanged(); }
+        }
+
+        /// <summary>设备管理ViewModel</summary>
+        public DeviceManagementViewModel DeviceManagementVM
+        {
+            get => mDeviceManagementVM;
+            set { mDeviceManagementVM = value; OnPropertyChanged(); }
+        }
+
         /// <summary>选中的设备（绑定到UI的ComboBox）</summary>
         public Device SelectedDevice
         {
@@ -208,6 +271,9 @@ namespace SmartAgricultureSystem.ViewModels
 
         /// <summary>打开个人中心命令</summary>
         public ICommand OpenProfileCommand { get; }
+
+        /// <summary>导航命令</summary>
+        public ICommand NavigateCommand { get; }
 
         #endregion
 
@@ -261,6 +327,13 @@ namespace SmartAgricultureSystem.ViewModels
             ToggleVirtualModeCommand = new RelayCommand(async _ => await ToggleVirtualModeAsync());
             LogoutCommand = new RelayCommand(async _ => await LogoutAsync());
             OpenProfileCommand = new RelayCommand(_ => OpenProfile());
+            NavigateCommand = new RelayCommand(param =>
+            {
+                if (param is int idx)
+                    SelectedNavIndex = idx;
+                else if (param is string s && int.TryParse(s, out int parsed))
+                    SelectedNavIndex = parsed;
+            });
 
             ConnectionStatus = "未连接";
         }
@@ -268,9 +341,27 @@ namespace SmartAgricultureSystem.ViewModels
         /// <summary>
         /// 设置当前用户信息
         /// </summary>
-        public void SetCurrentUser(string username)
+        public void SetCurrentUser(string username, UserRole role = UserRole.Farmer)
         {
             CurrentUsername = username;
+            CurrentUserRole = role;
+
+            // 初始化所有管理模块的ViewModel
+            CropManagementVM = new CropManagementViewModel();
+            GreenhouseManagementVM = new GreenhouseManagementViewModel();
+            DeviceManagementVM = new DeviceManagementViewModel();
+
+            if (IsAdmin)
+            {
+                UserManagementVM = new UserManagementViewModel();
+                // 管理员默认显示人员管理
+                SelectedNavIndex = 4;
+            }
+            else
+            {
+                // 普通用户默认显示数据监控
+                SelectedNavIndex = 0;
+            }
         }
 
         /// <summary>
@@ -474,7 +565,7 @@ namespace SmartAgricultureSystem.ViewModels
         /// 断开设备连接
         /// IP地址和端口号输入栏清空，温湿度曲线图初始化
         /// </summary>
-        private void Disconnect()
+        private async void Disconnect()
         {
             // 停止采集（如果正在运行）
             StopCollecting();
@@ -487,7 +578,7 @@ namespace SmartAgricultureSystem.ViewModels
             // 更新设备离线状态
             if (SelectedDevice != null && !IsVirtualMode)
             {
-                try { mDatabaseService.UpdateDeviceOnlineStatusAsync(SelectedDevice.id, false).Wait(); }
+                try { await mDatabaseService.UpdateDeviceOnlineStatusAsync(SelectedDevice.id, false); }
                 catch { /* 忽略 */ }
             }
 

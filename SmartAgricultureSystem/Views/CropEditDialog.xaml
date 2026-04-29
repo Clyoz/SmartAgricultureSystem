@@ -1,0 +1,72 @@
+<Window x:Class="SmartAgricultureSystem.Views.CropEditDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="编辑作物" Height="500" Width="450"
+        Background="#1E1E2E" WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="作物名称:" Foreground="#CDD6F4" Margin="0,5"/>
+        <TextBox Grid.Row="1" x:Name="TxtCropName" Background="#313244" Foreground="White" Padding="5" Margin="0,2"/>
+
+        <TextBlock Grid.Row="2" Text="品种:" Foreground="#CDD6F4" Margin="0,8,0,5"/>
+        <TextBox Grid.Row="3" x:Name="TxtVariety" Background="#313244" Foreground="White" Padding="5" Margin="0,2"/>
+
+        <Grid Grid.Row="4" Margin="0,8,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock Text="适宜温度下限(℃):" Foreground="#CDD6F4" Margin="0,5"/>
+                <TextBox x:Name="TxtTempMin" Background="#313244" Foreground="White" Padding="5" Margin="0,2"/>
+            </StackPanel>
+            <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                <TextBlock Text="适宜温度上限(℃):" Foreground="#CDD6F4" Margin="0,5"/>
+                <TextBox x:Name="TxtTempMax" Background="#313244" Foreground="White" Padding="5" Margin="0,2"/>
+            </StackPanel>
+        </Grid>
+
+        <Grid Grid.Row="5" Margin="0,8,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock Text="适宜湿度下限(%):" Foreground="#CDD6F4" Margin="0,5"/>
+                <TextBox x:Name="TxtHumidityMin" Background="#313244" Foreground="White" Padding="5" Margin="0,2"/>
+            </StackPanel>
+            <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                <TextBlock Text="适宜湿度上限(%):" Foreground="#CDD6F4" Margin="0,5"/>
+                <TextBox x:Name="TxtHumidityMax" Background="#313244" Foreground="White" Padding="5" Margin="0,2"/>
+            </StackPanel>
+        </Grid>
+
+        <TextBlock Grid.Row="6" Text="生长周期(天):" Foreground="#CDD6F4" Margin="0,8,0,5"/>
+        <TextBox Grid.Row="7" x:Name="TxtGrowthCycle" Background="#313244" Foreground="White" Padding="5" Margin="0,2"/>
+
+        <TextBlock Grid.Row="8" Text="说明:" Foreground="#CDD6F4" Margin="0,8,0,5"/>
+        <TextBox x:Name="TxtDescription" Grid.Row="8" Margin="0,25,0,0"
+                 Background="#313244" Foreground="White" Padding="5"
+                 TextWrapping="Wrap" AcceptsReturn="True" Height="60" VerticalScrollBarVisibility="Auto"/>
+
+        <StackPanel Grid.Row="9" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
+            <Button Content="保存" Click="BtnSave_Click" Width="80" Margin="5,0"
+                    Background="#A6E3A1" Foreground="#1E1E2E" FontWeight="Bold" Cursor="Hand"/>
+            <Button Content="取消" Click="BtnCancel_Click" Width="80" Margin="5,0"
+                    Background="#45475A" Foreground="#CDD6F4" FontWeight="Bold" Cursor="Hand"/>
+        </StackPanel>
+    </Grid>
+</Window>

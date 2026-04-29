@@ -64,7 +64,7 @@
     <Reference Include="System.Numerics.Vectors, Version=4.1.6.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
       <HintPath>..\packages\System.Numerics.Vectors.4.6.1\lib\net462\System.Numerics.Vectors.dll</HintPath>
     </Reference>
-    <Reference Include="System.Runtime.CompilerServices.Unsafe, Version=6.0.3.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+    <Reference Include="System.Runtime.CompilerServices.Unsafe, Version=6.0.3.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
       <HintPath>..\packages\System.Runtime.CompilerServices.Unsafe.6.1.2\lib\net462\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
     </Reference>
     <Reference Include="System.Xml" />
@@ -85,54 +85,15 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="Helpers\BoolToColorConverter.cs" />
+    <Compile Include="Helpers\BoolToVisibilityConverter.cs" />
     <Compile Include="Helpers\CaptchaHelper.cs" />
     <Compile Include="Helpers\DBHelper.cs" />
+    <Compile Include="Helpers\InverseBoolConverter.cs" />
+    <Compile Include="Helpers\NavIndexToVisibilityConverter.cs" />
     <Compile Include="Helpers\PasswordHelper.cs" />
     <Compile Include="Helpers\RelayCommand.cs" />
     <Compile Include="Helpers\StringToVisibilityConverter.cs" />
-    <Compile Include="Helpers\BoolToColorConverter.cs" />
-    <Compile Include="Helpers\InverseBoolConverter.cs" />
-    <Compile Include="Models\LoginRecord.cs" />
-    <Compile Include="Models\User.cs" />
-    <Compile Include="Models\UserRole.cs" />
-    <Compile Include="Services\AlertService.cs" />
-    <Compile Include="Services\AuthService.cs" />
-    <Compile Include="Services\DatabaseService.cs" />
-    <Compile Include="Services\ModbusService.cs" />
-    <Compile Include="Services\VirtualModbusSlaveService.cs" />
-    <Compile Include="Services\SessionService.cs" />
-    <Compile Include="Services\UserService.cs" />
-    <Compile Include="ViewModels\LoginViewModel.cs" />
-    <Compile Include="ViewModels\MainViewModel.cs" />
-    <Compile Include="ViewModels\ProfileViewModel.cs" />
-    <Compile Include="Views\LoginWindow.xaml.cs">
-      <DependentUpon>LoginWindow.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="Views\ProfileWindow.xaml.cs">
-      <DependentUpon>ProfileWindow.xaml</DependentUpon>
-    </Compile>
-    <Page Include="Views\MainWindow.xaml">
-      <Generator>MSBuild:Compile</Generator>
-      <SubType>Designer</SubType>
-    </Page>
-    <Compile Include="App.xaml.cs">
-      <DependentUpon>App.xaml</DependentUpon>
-      <SubType>Code</SubType>
-    </Compile>
-    <Compile Include="Views\MainWindow.xaml.cs">
-      <DependentUpon>MainWindow.xaml</DependentUpon>
-      <SubType>Code</SubType>
-    </Compile>
-    <Page Include="Views\LoginWindow.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="Views\ProfileWindow.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-  </ItemGroup>
-  <ItemGroup>
     <Compile Include="Models\AlertConfig.cs" />
     <Compile Include="Models\AlertRecord.cs" />
     <Compile Include="Models\AlertRule.cs" />
@@ -141,9 +102,123 @@
     <Compile Include="Models\Device.cs" />
     <Compile Include="Models\Greenhouse.cs" />
     <Compile Include="Models\GreenhouseCrop.cs" />
+    <Compile Include="Models\LoginRecord.cs" />
     <Compile Include="Models\Sensor.cs" />
     <Compile Include="Models\SensorData.cs" />
     <Compile Include="Models\SystemConfig.cs" />
+    <Compile Include="Models\User.cs" />
+    <Compile Include="Models\UserRole.cs" />
+    <Compile Include="Services\AlertService.cs" />
+    <Compile Include="Services\AuthService.cs" />
+    <Compile Include="Services\DatabaseService.cs" />
+    <Compile Include="Services\ModbusService.cs" />
+    <Compile Include="Services\SessionService.cs" />
+    <Compile Include="Services\UserService.cs" />
+    <Compile Include="Services\VirtualModbusSlaveService.cs" />
+    <Compile Include="ViewModels\CropManagementViewModel.cs" />
+    <Compile Include="ViewModels\DeviceManagementViewModel.cs" />
+    <Compile Include="ViewModels\GreenhouseManagementViewModel.cs" />
+    <Compile Include="ViewModels\LoginViewModel.cs" />
+    <Compile Include="ViewModels\MainViewModel.cs" />
+    <Compile Include="ViewModels\ProfileViewModel.cs" />
+    <Compile Include="ViewModels\UserManagementViewModel.cs" />
+    <Compile Include="Views\CropEditDialog.xaml.cs">
+      <DependentUpon>CropEditDialog.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\CropManagementView.xaml.cs">
+      <DependentUpon>CropManagementView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\DeviceEditDialog.xaml.cs">
+      <DependentUpon>DeviceEditDialog.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\DeviceManagementView.xaml.cs">
+      <DependentUpon>DeviceManagementView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\GreenhouseEditDialog.xaml.cs">
+      <DependentUpon>GreenhouseEditDialog.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\GreenhouseManagementView.xaml.cs">
+      <DependentUpon>GreenhouseManagementView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\LoginLogsWindow.xaml.cs">
+      <DependentUpon>LoginLogsWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\LoginWindow.xaml.cs">
+      <DependentUpon>LoginWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\MainWindow.xaml.cs">
+      <DependentUpon>MainWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\ProfileWindow.xaml.cs">
+      <DependentUpon>ProfileWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\ResetPasswordDialog.xaml.cs">
+      <DependentUpon>ResetPasswordDialog.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\UserEditDialog.xaml.cs">
+      <DependentUpon>UserEditDialog.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\UserManagementView.xaml.cs">
+      <DependentUpon>UserManagementView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="App.xaml.cs">
+      <DependentUpon>App.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
+    <Page Include="Views\CropEditDialog.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Views\CropManagementView.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Views\DeviceEditDialog.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Views\DeviceManagementView.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Views\GreenhouseEditDialog.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Views\GreenhouseManagementView.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Views\LoginLogsWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Views\LoginWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\MainWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Views\ProfileWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\ResetPasswordDialog.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Views\UserEditDialog.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Views\UserManagementView.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+  </ItemGroup>
+  <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs">
       <SubType>Code</SubType>
     </Compile>

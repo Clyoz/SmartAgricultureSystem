@@ -2,159 +2,376 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:lvc="clr-namespace:LiveCharts.Wpf;assembly=LiveCharts.Wpf"
+        xmlns:local="clr-namespace:SmartAgricultureSystem.Views"
         Title="智慧农业温湿度检测与预警系统"
-        Height="700" Width="1100"
+        Height="750" Width="1200"
         Background="#1E1E2E">
 
-    <Grid Margin="10">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="50"/>
-            <!-- 标题栏+用户信息 -->
-            <RowDefinition Height="80"/>
-            <!-- 连接配置 -->
-            <RowDefinition Height="120"/>
-            <!-- 实时数据 -->
-            <RowDefinition Height="*"/>
-            <!-- 图表区域 -->
-            <RowDefinition Height="120"/>
-            <!-- 历史数据 -->
-            <RowDefinition Height="50"/>
-            <!-- 预警信息 -->
-        </Grid.RowDefinitions>
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="200"/>
+            <!-- 左侧导航栏 -->
+            <ColumnDefinition Width="*"/>
+            <!-- 右侧内容区 -->
+        </Grid.ColumnDefinitions>
 
-        <!-- 标题 + 用户信息 -->
-        <Grid Grid.Row="0">
-            <TextBlock Text="智慧农业温湿度检测与预警系统"
-                       FontSize="22" FontWeight="Bold"
-                       Foreground="#A6E3A1"
-                       VerticalAlignment="Center"
-                       HorizontalAlignment="Center"/>
-            <StackPanel Orientation="Horizontal"
-                        HorizontalAlignment="Right"
-                        VerticalAlignment="Center">
-                <Button Content="个人中心" Command="{Binding OpenProfileCommand}"
-                        Background="#89B4FA" Foreground="#1E1E2E"
-                        FontWeight="Bold" FontSize="12"
-                        Padding="10,4" Margin="5,0"
-                        Cursor="Hand"/>
-                <TextBlock Foreground="#CDD6F4" FontSize="14"
-                           VerticalAlignment="Center" Margin="5,0">
-                    <Run Text="用户: "/>
-                    <Run Text="{Binding CurrentUsername, Mode=OneWay}" FontWeight="Bold"/>
-                </TextBlock>
-                <Button Content="退出登录" Command="{Binding LogoutCommand}"
-                        Background="#F38BA8" Foreground="#1E1E2E"
-                        FontWeight="Bold" FontSize="12"
-                        Padding="10,4" Margin="5,0"
-                        Cursor="Hand"/>
-            </StackPanel>
-        </Grid>
+        <!-- ==================== 左侧导航栏 ==================== -->
+        <Border Grid.Column="0" Background="#181825" CornerRadius="0" Margin="0,10,0,10">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <!-- Logo/系统名 -->
+                    <RowDefinition Height="*"/>
+                    <!-- 菜单项 -->
+                    <RowDefinition Height="Auto"/>
+                    <!-- 底部用户信息 -->
+                </Grid.RowDefinitions>
 
-        <!-- 连接配置区 -->
-        <StackPanel Grid.Row="1" Orientation="Horizontal"
-                    HorizontalAlignment="Center" VerticalAlignment="Center">
-            <CheckBox Content="虚拟模式" IsChecked="{Binding IsVirtualMode}"
-                      Foreground="#F9E2AF" FontWeight="Bold" FontSize="13"
-                      VerticalAlignment="Center" Margin="5,0"
-                      Command="{Binding ToggleVirtualModeCommand}"/>
-            <TextBlock Text="选择设备:" Foreground="White" VerticalAlignment="Center" Margin="5,0,0,0"/>
-            <ComboBox ItemsSource="{Binding DeviceList}"
-                      SelectedItem="{Binding SelectedDevice}"
-                      DisplayMemberPath="name"
-                      Width="140" Margin="5"
-                      Background="#313244" Foreground="White"
-                      IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBoolConverter}}"/>
-            <TextBlock Text="IP地址:" Foreground="White" VerticalAlignment="Center" Margin="5,0,0,0"/>
-            <TextBox Text="{Binding DeviceIp, UpdateSourceTrigger=PropertyChanged}" Width="120" Margin="5"
-                     Background="#313244" Foreground="White" Padding="5"
-                     IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBoolConverter}}"/>
-            <TextBlock Text="端口:" Foreground="White" VerticalAlignment="Center" Margin="5,0,0,0"/>
-            <TextBox Text="{Binding DevicePort, UpdateSourceTrigger=PropertyChanged}" Width="60" Margin="5"
-                     Background="#313244" Foreground="White" Padding="5"
-                     IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBoolConverter}}"/>
-            <Button Content="连接" Command="{Binding ConnectCommand}"
-                    Width="70" Margin="3" Background="#89B4FA" FontWeight="Bold"
-                    Cursor="Hand"/>
-            <Button Content="断开" Command="{Binding DisconnectCommand}"
-                    Width="70" Margin="3" Background="#F38BA8" FontWeight="Bold"
-                    Cursor="Hand"/>
-            <Button Content="开始采集" Command="{Binding StartCollectCommand}"
-                    Width="80" Margin="3" Background="#A6E3A1" FontWeight="Bold"
-                    Cursor="Hand"/>
-            <Button Content="停止采集" Command="{Binding StopCollectCommand}"
-                    Width="80" Margin="3" Background="#FAB387" FontWeight="Bold"
-                    Cursor="Hand"/>
-            <TextBlock Text="{Binding ConnectionStatus}"
-                       Foreground="#CDD6F4" VerticalAlignment="Center" Margin="5,0"/>
-        </StackPanel>
-
-        <!-- 实时数据显示 -->
-        <StackPanel Grid.Row="2" Orientation="Horizontal"
-                    HorizontalAlignment="Center" VerticalAlignment="Center">
-            <!-- 温度卡片 -->
-            <Border Background="#313244" CornerRadius="10"
-                    Padding="20,10" Margin="20,5">
-                <StackPanel>
-                    <TextBlock Text="当前温度" Foreground="#CDD6F4"
-                               FontSize="14" HorizontalAlignment="Center"/>
-                    <TextBlock FontSize="36" FontWeight="Bold"
-                               Foreground="#F38BA8" HorizontalAlignment="Center">
-                        <Run Text="{Binding CurrentTemperature, StringFormat={}{0:F1}}"/>
-                        <Run Text="℃"/>
-                    </TextBlock>
+                <!-- 系统名称 -->
+                <StackPanel Grid.Row="0" Margin="15,20,15,20">
+                    <TextBlock Text="智慧农业系统" FontSize="18" FontWeight="Bold"
+                               Foreground="#A6E3A1" HorizontalAlignment="Center"/>
+                    <Border Background="#45475A" Height="1" Margin="0,10,0,0"/>
                 </StackPanel>
-            </Border>
 
-            <!-- 湿度卡片 -->
-            <Border Background="#313244" CornerRadius="10"
-                    Padding="20,10" Margin="20,5">
-                <StackPanel>
-                    <TextBlock Text="当前湿度" Foreground="#CDD6F4"
-                               FontSize="14" HorizontalAlignment="Center"/>
-                    <TextBlock FontSize="36" FontWeight="Bold"
-                               Foreground="#89B4FA" HorizontalAlignment="Center">
-                        <Run Text="{Binding CurrentHumidity, StringFormat={}{0:F1}}"/>
-                        <Run Text="%"/>
-                    </TextBlock>
+                <!-- 菜单导航 -->
+                <StackPanel Grid.Row="1" Margin="10,0">
+                    <!-- 数据监控 -->
+                    <Button Command="{Binding NavigateCommand}" CommandParameter="0"
+                            Background="Transparent" BorderThickness="0"
+                            HorizontalContentAlignment="Left" Padding="15,10"
+                            Cursor="Hand" Margin="0,2">
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border x:Name="Bd" Background="Transparent" CornerRadius="8" Padding="{TemplateBinding Padding}">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="&#xE720;" FontFamily="Segoe MDL2 Assets" FontSize="18"
+                                                               Foreground="#89B4FA" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                                    <TextBlock Text="数据监控" FontSize="14" Foreground="#CDD6F4"
+                                                               VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <DataTrigger Binding="{Binding SelectedNavIndex}" Value="0">
+                                                    <Setter TargetName="Bd" Property="Background" Value="#313244"/>
+                                                </DataTrigger>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Bd" Property="Background" Value="#313244"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+
+                    <!-- 蔬菜管理 -->
+                    <Button Command="{Binding NavigateCommand}" CommandParameter="1"
+                            Background="Transparent" BorderThickness="0"
+                            HorizontalContentAlignment="Left" Padding="15,10"
+                            Cursor="Hand" Margin="0,2">
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border x:Name="Bd" Background="Transparent" CornerRadius="8" Padding="{TemplateBinding Padding}">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="&#xE8C6;" FontFamily="Segoe MDL2 Assets" FontSize="18"
+                                                               Foreground="#A6E3A1" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                                    <TextBlock Text="蔬菜管理" FontSize="14" Foreground="#CDD6F4"
+                                                               VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <DataTrigger Binding="{Binding SelectedNavIndex}" Value="1">
+                                                    <Setter TargetName="Bd" Property="Background" Value="#313244"/>
+                                                </DataTrigger>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Bd" Property="Background" Value="#313244"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+
+                    <!-- 大棚管理 -->
+                    <Button Command="{Binding NavigateCommand}" CommandParameter="2"
+                            Background="Transparent" BorderThickness="0"
+                            HorizontalContentAlignment="Left" Padding="15,10"
+                            Cursor="Hand" Margin="0,2">
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border x:Name="Bd" Background="Transparent" CornerRadius="8" Padding="{TemplateBinding Padding}">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="&#xE8F1;" FontFamily="Segoe MDL2 Assets" FontSize="18"
+                                                               Foreground="#F9E2AF" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                                    <TextBlock Text="大棚管理" FontSize="14" Foreground="#CDD6F4"
+                                                               VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <DataTrigger Binding="{Binding SelectedNavIndex}" Value="2">
+                                                    <Setter TargetName="Bd" Property="Background" Value="#313244"/>
+                                                </DataTrigger>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Bd" Property="Background" Value="#313244"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+
+                    <!-- 设备管理 -->
+                    <Button Command="{Binding NavigateCommand}" CommandParameter="3"
+                            Background="Transparent" BorderThickness="0"
+                            HorizontalContentAlignment="Left" Padding="15,10"
+                            Cursor="Hand" Margin="0,2">
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border x:Name="Bd" Background="Transparent" CornerRadius="8" Padding="{TemplateBinding Padding}">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="&#xE950;" FontFamily="Segoe MDL2 Assets" FontSize="18"
+                                                               Foreground="#FAB387" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                                    <TextBlock Text="设备管理" FontSize="14" Foreground="#CDD6F4"
+                                                               VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <DataTrigger Binding="{Binding SelectedNavIndex}" Value="3">
+                                                    <Setter TargetName="Bd" Property="Background" Value="#313244"/>
+                                                </DataTrigger>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Bd" Property="Background" Value="#313244"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+
+                    <!-- 人员管理（仅管理员可见） -->
+                    <Button Command="{Binding NavigateCommand}" CommandParameter="4"
+                            Background="Transparent" BorderThickness="0"
+                            HorizontalContentAlignment="Left" Padding="15,10"
+                            Cursor="Hand" Margin="0,2"
+                            Visibility="{Binding IsAdmin, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border x:Name="Bd" Background="Transparent" CornerRadius="8" Padding="{TemplateBinding Padding}">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="&#xE77B;" FontFamily="Segoe MDL2 Assets" FontSize="18"
+                                                               Foreground="#F38BA8" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                                    <TextBlock Text="人员管理" FontSize="14" Foreground="#CDD6F4"
+                                                               VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <DataTrigger Binding="{Binding SelectedNavIndex}" Value="4">
+                                                    <Setter TargetName="Bd" Property="Background" Value="#313244"/>
+                                                </DataTrigger>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Bd" Property="Background" Value="#313244"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </Button.Style>
+                    </Button>
                 </StackPanel>
-            </Border>
-        </StackPanel>
 
-        <!-- 实时折线图 -->
-        <lvc:CartesianChart Grid.Row="3" Margin="10"
-                            Series="{Binding ChartSeries}"
-                            Background="#313244">
-            <lvc:CartesianChart.AxisX>
-                <lvc:Axis Labels="{Binding TimeLabels}"
-                          Foreground="White" FontSize="10"/>
-            </lvc:CartesianChart.AxisX>
-            <lvc:CartesianChart.AxisY>
-                <lvc:Axis Title="数值" Foreground="White"/>
-            </lvc:CartesianChart.AxisY>
-        </lvc:CartesianChart>
-
-        <!-- 历史数据表格 -->
-        <DataGrid Grid.Row="4" ItemsSource="{Binding HistoryData}"
-                  AutoGenerateColumns="False" IsReadOnly="True"
-                  Background="#313244" Foreground="White"
-                  RowBackground="#45475A" AlternatingRowBackground="#313244"
-                  Margin="10,5">
-            <DataGrid.Columns>
-                <DataGridTextColumn Header="时间" Binding="{Binding timestamp, StringFormat={}{0:HH:mm:ss}}" Width="100"/>
-                <DataGridTextColumn Header="大棚ID" Binding="{Binding greenhouseId}" Width="60"/>
-                <DataGridTextColumn Header="设备ID" Binding="{Binding deviceId}" Width="60"/>
-                <DataGridTextColumn Header="温度(℃)" Binding="{Binding temperature, StringFormat={}{0:F1}}" Width="80"/>
-                <DataGridTextColumn Header="湿度(%)" Binding="{Binding humidity, StringFormat={}{0:F1}}" Width="80"/>
-                <DataGridTextColumn Header="预警" Binding="{Binding isAlert}" Width="60"/>
-            </DataGrid.Columns>
-        </DataGrid>
-
-        <!-- 预警信息栏 -->
-        <Border Grid.Row="5" Background="#45475A" CornerRadius="5" Margin="10,5">
-            <TextBlock Text="{Binding LatestAlert}"
-                       Foreground="#F38BA8" FontSize="13"
-                       VerticalAlignment="Center" Margin="10,0"
-                       TextWrapping="Wrap"/>
+                <!-- 底部用户信息和操作 -->
+                <StackPanel Grid.Row="2" Margin="10,10,10,15">
+                    <Border Background="#45475A" Height="1" Margin="5,0,5,10"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,5">
+                        <TextBlock Foreground="#CDD6F4" FontSize="13" VerticalAlignment="Center">
+                            <Run Text="用户: "/>
+                            <Run Text="{Binding CurrentUsername, Mode=OneWay}" FontWeight="Bold"/>
+                        </TextBlock>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button Content="个人中心" Command="{Binding OpenProfileCommand}"
+                                Background="#89B4FA" Foreground="#1E1E2E"
+                                FontWeight="Bold" FontSize="11"
+                                Padding="8,3" Margin="3,0"
+                                Cursor="Hand"/>
+                        <Button Content="退出登录" Command="{Binding LogoutCommand}"
+                                Background="#F38BA8" Foreground="#1E1E2E"
+                                FontWeight="Bold" FontSize="11"
+                                Padding="8,3" Margin="3,0"
+                                Cursor="Hand"/>
+                    </StackPanel>
+                </StackPanel>
+            </Grid>
         </Border>
+
+        <!-- ==================== 右侧内容区 ==================== -->
+        <Grid Grid.Column="1" Margin="0,10,10,10">
+            <!-- 页面0: 数据监控（默认） -->
+            <Grid Margin="10" Visibility="{Binding SelectedNavIndex, Converter={StaticResource NavIndexToVisibilityConverter}, ConverterParameter=0}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="40"/>
+                    <RowDefinition Height="80"/>
+                    <RowDefinition Height="120"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="120"/>
+                    <RowDefinition Height="40"/>
+                </Grid.RowDefinitions>
+
+                <!-- 标题 -->
+                <TextBlock Grid.Row="0" Text="数据监控" FontSize="20" FontWeight="Bold"
+                           Foreground="#A6E3A1" VerticalAlignment="Center" Margin="10,0"/>
+
+                <!-- 连接配置区 -->
+                <StackPanel Grid.Row="1" Orientation="Horizontal"
+                            HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <CheckBox Content="虚拟模式" IsChecked="{Binding IsVirtualMode}"
+                              Foreground="#F9E2AF" FontWeight="Bold" FontSize="13"
+                              VerticalAlignment="Center" Margin="5,0"
+                              Command="{Binding ToggleVirtualModeCommand}"/>
+                    <TextBlock Text="选择设备:" Foreground="White" VerticalAlignment="Center" Margin="5,0,0,0"/>
+                    <ComboBox ItemsSource="{Binding DeviceList}"
+                              SelectedItem="{Binding SelectedDevice}"
+                              DisplayMemberPath="name"
+                              Width="140" Margin="5"
+                              Background="#313244" Foreground="White"
+                              IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBoolConverter}}"/>
+                    <TextBlock Text="IP地址:" Foreground="White" VerticalAlignment="Center" Margin="5,0,0,0"/>
+                    <TextBox Text="{Binding DeviceIp, UpdateSourceTrigger=PropertyChanged}" Width="120" Margin="5"
+                             Background="#313244" Foreground="White" Padding="5"
+                             IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBoolConverter}}"/>
+                    <TextBlock Text="端口:" Foreground="White" VerticalAlignment="Center" Margin="5,0,0,0"/>
+                    <TextBox Text="{Binding DevicePort, UpdateSourceTrigger=PropertyChanged}" Width="60" Margin="5"
+                             Background="#313244" Foreground="White" Padding="5"
+                             IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBoolConverter}}"/>
+                    <Button Content="连接" Command="{Binding ConnectCommand}"
+                            Width="70" Margin="3" Background="#89B4FA" FontWeight="Bold"
+                            Cursor="Hand"/>
+                    <Button Content="断开" Command="{Binding DisconnectCommand}"
+                            Width="70" Margin="3" Background="#F38BA8" FontWeight="Bold"
+                            Cursor="Hand"/>
+                    <Button Content="开始采集" Command="{Binding StartCollectCommand}"
+                            Width="80" Margin="3" Background="#A6E3A1" FontWeight="Bold"
+                            Cursor="Hand"/>
+                    <Button Content="停止采集" Command="{Binding StopCollectCommand}"
+                            Width="80" Margin="3" Background="#FAB387" FontWeight="Bold"
+                            Cursor="Hand"/>
+                    <TextBlock Text="{Binding ConnectionStatus}"
+                               Foreground="#CDD6F4" VerticalAlignment="Center" Margin="5,0"/>
+                </StackPanel>
+
+                <!-- 实时数据显示 -->
+                <StackPanel Grid.Row="2" Orientation="Horizontal"
+                            HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <!-- 温度卡片 -->
+                    <Border Background="#313244" CornerRadius="10"
+                            Padding="20,10" Margin="20,5">
+                        <StackPanel>
+                            <TextBlock Text="当前温度" Foreground="#CDD6F4"
+                                       FontSize="14" HorizontalAlignment="Center"/>
+                            <TextBlock FontSize="36" FontWeight="Bold"
+                                       Foreground="#F38BA8" HorizontalAlignment="Center">
+                                <Run Text="{Binding CurrentTemperature, StringFormat={}{0:F1}}"/>
+                                <Run Text="℃"/>
+                            </TextBlock>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- 湿度卡片 -->
+                    <Border Background="#313244" CornerRadius="10"
+                            Padding="20,10" Margin="20,5">
+                        <StackPanel>
+                            <TextBlock Text="当前湿度" Foreground="#CDD6F4"
+                                       FontSize="14" HorizontalAlignment="Center"/>
+                            <TextBlock FontSize="36" FontWeight="Bold"
+                                       Foreground="#89B4FA" HorizontalAlignment="Center">
+                                <Run Text="{Binding CurrentHumidity, StringFormat={}{0:F1}}"/>
+                                <Run Text="%"/>
+                            </TextBlock>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- 实时折线图 -->
+                <lvc:CartesianChart Grid.Row="3" Margin="10"
+                                    Series="{Binding ChartSeries}"
+                                    Background="#313244">
+                    <lvc:CartesianChart.AxisX>
+                        <lvc:Axis Labels="{Binding TimeLabels}"
+                                  Foreground="White" FontSize="10"/>
+                    </lvc:CartesianChart.AxisX>
+                    <lvc:CartesianChart.AxisY>
+                        <lvc:Axis Title="数值" Foreground="White"/>
+                    </lvc:CartesianChart.AxisY>
+                </lvc:CartesianChart>
+
+                <!-- 历史数据表格 -->
+                <DataGrid Grid.Row="4" ItemsSource="{Binding HistoryData}"
+                          AutoGenerateColumns="False" IsReadOnly="True"
+                          Background="#313244" Foreground="White"
+                          RowBackground="#45475A" AlternatingRowBackground="#313244"
+                          Margin="10,5">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="时间" Binding="{Binding timestamp, StringFormat={}{0:HH:mm:ss}}" Width="100"/>
+                        <DataGridTextColumn Header="大棚ID" Binding="{Binding greenhouseId}" Width="60"/>
+                        <DataGridTextColumn Header="设备ID" Binding="{Binding deviceId}" Width="60"/>
+                        <DataGridTextColumn Header="温度(℃)" Binding="{Binding temperature, StringFormat={}{0:F1}}" Width="80"/>
+                        <DataGridTextColumn Header="湿度(%)" Binding="{Binding humidity, StringFormat={}{0:F1}}" Width="80"/>
+                        <DataGridTextColumn Header="预警" Binding="{Binding isAlert}" Width="60"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+
+                <!-- 预警信息栏 -->
+                <Border Grid.Row="5" Background="#45475A" CornerRadius="5" Margin="10,5">
+                    <TextBlock Text="{Binding LatestAlert}"
+                               Foreground="#F38BA8" FontSize="13"
+                               VerticalAlignment="Center" Margin="10,0"
+                               TextWrapping="Wrap"/>
+                </Border>
+            </Grid>
+
+            <!-- 页面1: 蔬菜管理 -->
+            <local:CropManagementView Margin="10"
+                                      DataContext="{Binding CropManagementVM}"
+                                      Visibility="{Binding DataContext.SelectedNavIndex, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource NavIndexToVisibilityConverter}, ConverterParameter=1}"/>
+
+            <!-- 页面2: 大棚管理 -->
+            <local:GreenhouseManagementView Margin="10"
+                                            DataContext="{Binding GreenhouseManagementVM}"
+                                            Visibility="{Binding DataContext.SelectedNavIndex, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource NavIndexToVisibilityConverter}, ConverterParameter=2}"/>
+
+            <!-- 页面3: 设备管理 -->
+            <local:DeviceManagementView Margin="10"
+                                        DataContext="{Binding DeviceManagementVM}"
+                                        Visibility="{Binding DataContext.SelectedNavIndex, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource NavIndexToVisibilityConverter}, ConverterParameter=3}"/>
+
+            <!-- 页面4: 人员管理（仅管理员） -->
+            <local:UserManagementView Margin="10"
+                                      DataContext="{Binding UserManagementVM}"
+                                      Visibility="{Binding DataContext.SelectedNavIndex, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource NavIndexToVisibilityConverter}, ConverterParameter=4}"/>
+        </Grid>
     </Grid>
 </Window>
