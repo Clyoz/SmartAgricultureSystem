@@ -38,7 +38,13 @@
             </StackPanel>
             <StackPanel Grid.Column="1" Margin="10,0,0,0">
                 <TextBlock Text="类型:" Foreground="#CDD6F4" Margin="0,5"/>
-                <ComboBox x:Name="CmbType" Background="#313244" Foreground="White" Padding="5" Margin="0,2">
+                <ComboBox x:Name="CmbType" Margin="0,2">
+                    <ComboBox.Resources>
+                        <Style TargetType="ComboBoxItem">
+                            <Setter Property="Background" Value="#1E1E2E"/>
+                            <Setter Property="Foreground" Value="#F5F5F5"/>
+                        </Style>
+                    </ComboBox.Resources>
                     <ComboBoxItem Content="玻璃温室"/>
                     <ComboBoxItem Content="塑料大棚"/>
                     <ComboBoxItem Content="日光温室"/>
@@ -48,8 +54,13 @@
         </Grid>
 
         <TextBlock Grid.Row="7" Text="状态:" Foreground="#CDD6F4" Margin="0,8,0,5"/>
-        <ComboBox Grid.Row="7" x:Name="CmbStatus" Background="#313244" Foreground="White" Padding="5"
-                  Margin="0,28,0,0" SelectedIndex="0">
+        <ComboBox Grid.Row="7" x:Name="CmbStatus" Margin="0,28,0,0" SelectedIndex="0">
+            <ComboBox.Resources>
+                <Style TargetType="ComboBoxItem">
+                    <Setter Property="Background" Value="#1E1E2E"/>
+                    <Setter Property="Foreground" Value="#F5F5F5"/>
+                </Style>
+            </ComboBox.Resources>
             <ComboBoxItem Content="空闲"/>
             <ComboBoxItem Content="种植中"/>
             <ComboBoxItem Content="维护中"/>

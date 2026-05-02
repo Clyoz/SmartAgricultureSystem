@@ -349,11 +349,13 @@ ELSE
                 using (var cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = @"
-SELECT id, deviceCode, name, greenhouseId, deviceType, ipAddress, port, slaveId, 
-    model, firmwareVersion, isOnline, lastOnlineTime, installDate, remark, createdAt, updatedAt
-FROM Devices 
-WHERE deviceType = 2
-ORDER BY id";
+SELECT d.id, d.deviceCode, d.name, d.greenhouseId, d.deviceType, d.ipAddress, d.port, d.slaveId, 
+    d.model, d.firmwareVersion, d.isOnline, d.lastOnlineTime, d.installDate, d.remark, d.createdAt, d.updatedAt,
+    ISNULL(g.name, '未知大棚') AS greenhouseName
+FROM Devices d
+LEFT JOIN Greenhouses g ON d.greenhouseId = g.id
+WHERE d.deviceType = 2
+ORDER BY d.id";
                     using (var reader = await cmd.ExecuteReaderAsync())
                     {
                         while (await reader.ReadAsync())
@@ -364,6 +366,7 @@ ORDER BY id";
                                 deviceCode = reader["deviceCode"]?.ToString(),
                                 name = reader["name"]?.ToString(),
                                 greenhouseId = (int)reader["greenhouseId"],
+                                greenhouseName = reader["greenhouseName"]?.ToString(),
                                 deviceType = (int)reader["deviceType"],
                                 ipAddress = reader["ipAddress"]?.ToString(),
                                 port = (int)reader["port"],
@@ -857,6 +860,105 @@ FROM LoginRecords ORDER BY loginTime DESC";
                                 failReason = reader["failReason"]?.ToString(),
                                 ipAddress = reader["ipAddress"]?.ToString(),
                                 deviceInfo = reader["deviceInfo"]?.ToString()
+                            });
+                        }
+                    }
+                }
+            }
+            return result;
+        }
+
+        #endregion
+
+        #region 大棚监控数据
+
+        /// <summary>
+        /// 获取所有大棚的监控数据（含最新温湿度、作物阈值）
+        /// </summary>
+        public async Task<List<GreenhouseMonitorData>> GetGreenhouseMonitorDataAsync()
+        {
+            var result = new List<GreenhouseMonitorData>();
+            using (var conn = CreateConnection())
+            {
+                await conn.OpenAsync();
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"
+SELECT g.id AS greenhouseId, g.name AS greenhouseName,
+    ISNULL(c.cropName, '未种植') AS cropName,
+    ISNULL(c.tempMin, 5) AS tempMin, ISNULL(c.tempMax, 40) AS tempMax,
+    ISNULL(c.humidityMin, 20) AS humidityMin, ISNULL(c.humidityMax, 90) AS humidityMax,
+    ISNULL(latest.temperature, 0) AS currentTemperature,
+    ISNULL(latest.humidity, 0) AS currentHumidity,
+    latest.timestamp AS lastUpdateTime
+FROM Greenhouses g
+LEFT JOIN GreenhouseCrops gc ON g.id = gc.greenhouseId AND gc.status = 1
+LEFT JOIN CropInfo c ON gc.cropId = c.id
+OUTER APPLY (
+    SELECT TOP 1 sd.temperature, sd.humidity, sd.timestamp
+    FROM SensorData sd WHERE sd.greenhouseId = g.id
+    ORDER BY sd.timestamp DESC
+) latest
+ORDER BY g.id";
+                    using (var reader = await cmd.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            result.Add(new GreenhouseMonitorData
+                            {
+                                greenhouseId = (int)reader["greenhouseId"],
+                                greenhouseName = reader["greenhouseName"]?.ToString(),
+                                cropName = reader["cropName"]?.ToString(),
+                                tempMin = Convert.ToDouble(reader["tempMin"]),
+                                tempMax = Convert.ToDouble(reader["tempMax"]),
+                                humidityMin = Convert.ToDouble(reader["humidityMin"]),
+                                humidityMax = Convert.ToDouble(reader["humidityMax"]),
+                                CurrentTemperature = Convert.ToDouble(reader["currentTemperature"]),
+                                CurrentHumidity = Convert.ToDouble(reader["currentHumidity"]),
+                                LastUpdateTime = reader["lastUpdateTime"] == DBNull.Value ? (DateTime?)null : (DateTime)reader["lastUpdateTime"]
+                            });
+                        }
+                    }
+                }
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// 获取所有大棚列表（仅ID和名称，用于初始化监控数据）
+        /// </summary>
+        public async Task<List<GreenhouseMonitorData>> GetGreenhousesForMonitorAsync()
+        {
+            var result = new List<GreenhouseMonitorData>();
+            using (var conn = CreateConnection())
+            {
+                await conn.OpenAsync();
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"
+SELECT g.id AS greenhouseId, g.name AS greenhouseName,
+    ISNULL(c.cropName, '未种植') AS cropName,
+    ISNULL(c.tempMin, 5) AS tempMin, ISNULL(c.tempMax, 40) AS tempMax,
+    ISNULL(c.humidityMin, 20) AS humidityMin, ISNULL(c.humidityMax, 90) AS humidityMax
+FROM Greenhouses g
+LEFT JOIN GreenhouseCrops gc ON g.id = gc.greenhouseId AND gc.status = 1
+LEFT JOIN CropInfo c ON gc.cropId = c.id
+ORDER BY g.id";
+                    using (var reader = await cmd.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            result.Add(new GreenhouseMonitorData
+                            {
+                                greenhouseId = (int)reader["greenhouseId"],
+                                greenhouseName = reader["greenhouseName"]?.ToString(),
+                                cropName = reader["cropName"]?.ToString(),
+                                tempMin = Convert.ToDouble(reader["tempMin"]),
+                                tempMax = Convert.ToDouble(reader["tempMax"]),
+                                humidityMin = Convert.ToDouble(reader["humidityMin"]),
+                                humidityMax = Convert.ToDouble(reader["humidityMax"]),
+                                CurrentTemperature = 0,
+                                CurrentHumidity = 0
                             });
                         }
                     }

@@ -31,12 +31,26 @@
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
             <StackPanel>
-                <TextBlock Text="所属大棚ID:" Foreground="#CDD6F4" Margin="0,5"/>
-                <TextBox x:Name="TxtGreenhouseId" Background="#313244" Foreground="White" Padding="5" Margin="0,2"/>
+                <TextBlock Text="所属大棚:" Foreground="#CDD6F4" Margin="0,5"/>
+                <ComboBox x:Name="CmbGreenhouse" DisplayMemberPath="name" SelectedValuePath="id"
+                          Margin="0,2">
+                    <ComboBox.Resources>
+                        <Style TargetType="ComboBoxItem">
+                            <Setter Property="Background" Value="#1E1E2E"/>
+                            <Setter Property="Foreground" Value="#F5F5F5"/>
+                        </Style>
+                    </ComboBox.Resources>
+                </ComboBox>
             </StackPanel>
             <StackPanel Grid.Column="1" Margin="10,0,0,0">
                 <TextBlock Text="设备类型:" Foreground="#CDD6F4" Margin="0,5"/>
-                <ComboBox x:Name="CmbDeviceType" Background="#313244" Foreground="White" Padding="5" Margin="0,2" SelectedIndex="1">
+                <ComboBox x:Name="CmbDeviceType" Margin="0,2" SelectedIndex="1">
+                    <ComboBox.Resources>
+                        <Style TargetType="ComboBoxItem">
+                            <Setter Property="Background" Value="#1E1E2E"/>
+                            <Setter Property="Foreground" Value="#F5F5F5"/>
+                        </Style>
+                    </ComboBox.Resources>
                     <ComboBoxItem Content="网关"/>
                     <ComboBoxItem Content="传感器节点"/>
                     <ComboBoxItem Content="控制器"/>

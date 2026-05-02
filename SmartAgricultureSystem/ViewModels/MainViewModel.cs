@@ -4,6 +4,7 @@ using SmartAgricultureSystem.Helpers;
 using SmartAgricultureSystem.Models;
 using SmartAgricultureSystem.Services;
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
@@ -75,6 +76,9 @@ namespace SmartAgricultureSystem.ViewModels
         // 当前登录用户名
         private string mCurrentUsername;
 
+        // 设备所属大棚位置
+        private string mDeviceLocation;
+
         // 当前用户角色
         private UserRole mCurrentUserRole;
 
@@ -113,6 +117,13 @@ namespace SmartAgricultureSystem.ViewModels
 
         // 设备列表（从数据库加载）
         public ObservableCollection<Device> DeviceList { get; set; }
+
+        // 大棚监控数据列表
+        public ObservableCollection<GreenhouseMonitorData> GreenhouseMonitorList { get; set; }
+
+        // 预警状态记录（用于检测状态变化，避免重复弹窗）
+        private readonly Dictionary<int, int> mPreviousTempStatus = new Dictionary<int, int>();
+        private readonly Dictionary<int, int> mPreviousHumStatus = new Dictionary<int, int>();
 
         #region 属性绑定
 
@@ -170,6 +181,13 @@ namespace SmartAgricultureSystem.ViewModels
         {
             get => mDevicePort;
             set { mDevicePort = value; OnPropertyChanged(); }
+        }
+
+        /// <summary>设备所属大棚位置（连接后显示）</summary>
+        public string DeviceLocation
+        {
+            get => mDeviceLocation;
+            set { mDeviceLocation = value; OnPropertyChanged(); }
         }
 
         /// <summary>是否使用虚拟模式（绑定到UI）</summary>
@@ -240,10 +258,29 @@ namespace SmartAgricultureSystem.ViewModels
                 mSelectedDevice = value;
                 OnPropertyChanged();
                 // 选择设备后自动填充IP和端口
-                if (mSelectedDevice != null && !IsVirtualMode)
+                if (mSelectedDevice != null)
                 {
-                    DeviceIp = mSelectedDevice.ipAddress ?? "";
-                    DevicePort = mSelectedDevice.port;
+                    if (IsVirtualMode)
+                    {
+                        // 虚拟模式：自动填充127.0.0.1和默认端口
+                        DeviceIp = "127.0.0.1";
+                        DevicePort = 5020;
+                    }
+                    else
+                    {
+                        DeviceIp = mSelectedDevice.ipAddress ?? "";
+                        DevicePort = mSelectedDevice.port;
+                    }
+                    // 显示设备所属大棚
+                    DeviceLocation = !string.IsNullOrEmpty(mSelectedDevice.greenhouseName)
+                        ? $"📍 {mSelectedDevice.greenhouseName}"
+                        : "";
+                }
+                else
+                {
+                    DeviceIp = "";
+                    DevicePort = 0;
+                    DeviceLocation = "";
                 }
             }
         }
@@ -301,9 +338,10 @@ namespace SmartAgricultureSystem.ViewModels
             TimeLabels = new ObservableCollection<string>();
             HistoryData = new ObservableCollection<SensorData>();
             DeviceList = new ObservableCollection<Device>();
+            GreenhouseMonitorList = new ObservableCollection<GreenhouseMonitorData>();
 
-            // 异步加载设备列表
-            LoadDevicesAsync();
+            // 异步加载大棚监控数据
+            LoadGreenhouseMonitorDataAsync();
 
             // 初始化图表系列
             ChartSeries = new SeriesCollection {
@@ -335,6 +373,7 @@ namespace SmartAgricultureSystem.ViewModels
                     SelectedNavIndex = parsed;
             });
 
+            IsVirtualMode = true;
             ConnectionStatus = "未连接";
         }
 
@@ -354,14 +393,12 @@ namespace SmartAgricultureSystem.ViewModels
             if (IsAdmin)
             {
                 UserManagementVM = new UserManagementViewModel();
-                // 管理员默认显示人员管理
-                SelectedNavIndex = 4;
             }
-            else
-            {
-                // 普通用户默认显示数据监控
-                SelectedNavIndex = 0;
-            }
+            // 所有用户默认显示数据监控
+            SelectedNavIndex = 0;
+
+            // 初始为未连接状态，数据为0
+            ConnectionStatus = "未连接 · 点击连接开始实时监控";
         }
 
         /// <summary>
@@ -387,6 +424,102 @@ namespace SmartAgricultureSystem.ViewModels
             {
                 Console.WriteLine($"[设备列表] 加载失败: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// 异步加载大棚监控数据（初始温湿度为0，连接后才开始实时更新）
+        /// </summary>
+        private async void LoadGreenhouseMonitorDataAsync()
+        {
+            try
+            {
+                var data = await mDatabaseService.GetGreenhouseMonitorDataAsync();
+                GreenhouseMonitorList.Clear();
+                mPreviousTempStatus.Clear();
+                mPreviousHumStatus.Clear();
+                foreach (var item in data)
+                {
+                    item.CurrentTemperature = 0;
+                    item.CurrentHumidity = 0;
+                    item.LastUpdateTime = null;
+                    item.IsStabilized = false;
+                    // 初始目标值设为阈值中间值
+                    item.TargetTemperature = Math.Round((item.tempMin + item.tempMax) / 2, 1);
+                    item.TargetHumidity = Math.Round((item.humidityMin + item.humidityMax) / 2, 1);
+                    GreenhouseMonitorList.Add(item);
+                    mPreviousTempStatus[item.greenhouseId] = 0;
+                    mPreviousHumStatus[item.greenhouseId] = 0;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[大棚监控] 加载失败: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 虚拟模式下模拟所有大棚的温湿度数据变化
+        /// </summary>
+        private CancellationTokenSource mVirtualMonitorCts;
+
+        private void StartVirtualMonitorSimulation()
+        {
+            StopVirtualMonitorSimulation();
+            mVirtualMonitorCts = new CancellationTokenSource();
+            var token = mVirtualMonitorCts.Token;
+
+            var random = new Random();
+            _ = Task.Run(async () =>
+            {
+                while (!token.IsCancellationRequested)
+                {
+                    try
+                    {
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            foreach (var gh in GreenhouseMonitorList)
+                            {
+                                double targetTemp = gh.TargetTemperature;
+                                double targetHum = gh.TargetHumidity;
+
+                                // 添加小幅随机波动模拟真实传感器
+                                double tempNoise = (random.NextDouble() - 0.5) * 1.0;
+                                double humNoise = (random.NextDouble() - 0.5) * 1.5;
+
+                                // 直接设置为目标值 + 噪声，无平滑过渡
+                                double newTemp = Math.Round(targetTemp + tempNoise, 1);
+                                double newHum = Math.Round(targetHum + humNoise, 1);
+
+                                gh.CurrentTemperature = newTemp;
+                                gh.CurrentHumidity = newHum;
+                                gh.LastUpdateTime = DateTime.Now;
+
+                                // 首次赋值后直接标记为稳定，初始化预警状态
+                                if (!gh.IsStabilized)
+                                {
+                                    gh.IsStabilized = true;
+                                    mPreviousTempStatus[gh.greenhouseId] = gh.TempStatus;
+                                    mPreviousHumStatus[gh.greenhouseId] = gh.HumidityStatus;
+                                }
+
+                                // 检查预警并弹窗
+                                CheckAndAlertGreenhouse(gh);
+                            }
+                        });
+                        await Task.Delay(2000, token);
+                    }
+                    catch (OperationCanceledException) { break; }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[虚拟监控] 异常: {ex.Message}");
+                    }
+                }
+            }, token);
+        }
+
+        private void StopVirtualMonitorSimulation()
+        {
+            mVirtualMonitorCts?.Cancel();
         }
 
         /// <summary>
@@ -424,93 +557,42 @@ namespace SmartAgricultureSystem.ViewModels
         }
 
         /// <summary>
-        /// 异步连接到Modbus设备
-        /// 连接后定时读取当前温湿度值（仅更新数值卡片，不更新曲线图）
+        /// 连接设备，启动大棚数据实时更新
         /// </summary>
         private async Task ConnectAsync()
         {
-            // 输入验证
-            if (IsVirtualMode)
-            {
-                // 虚拟模式无需验证IP
-            }
-            else
-            {
-                if (string.IsNullOrWhiteSpace(DeviceIp))
-                {
-                    MessageBox.Show("请输入IP地址！", "提示");
-                    return;
-                }
-                if (DevicePort <= 0 || DevicePort > 65535)
-                {
-                    MessageBox.Show("请输入有效的端口号（1-65535）！", "提示");
-                    return;
-                }
-            }
+            if (IsConnected) return;
 
             ConnectionStatus = "连接中...";
 
-            if (IsVirtualMode)
+            try
             {
-                // 虚拟模式：启动本地从站，使用用户输入的端口（默认5020）
-                int virtualPort = DevicePort > 0 ? DevicePort : 5020;
-                try
+                // 启动本地虚拟从站
+                int virtualPort = 5020;
+                mVirtualSlave = new VirtualModbusSlaveService(virtualPort);
+                mVirtualSlave.Start();
+                await Task.Delay(500);
+
+                // 连接到虚拟从站
+                mModbusService = new ModbusService("127.0.0.1", virtualPort);
+                bool success = await mModbusService.ConnectAsync();
+                if (success)
                 {
-                    mVirtualSlave = new VirtualModbusSlaveService(virtualPort);
-                    mVirtualSlave.Start();
-                    // 短暂等待从站启动
-                    await Task.Delay(500);
-                    mModbusService = new ModbusService("127.0.0.1", virtualPort);
-                    bool success = await mModbusService.ConnectAsync();
-                    if (success)
-                    {
-                        IsConnected = true;
-                        ConnectionStatus = $"已连接 (虚拟模式 127.0.0.1:{virtualPort})";
-                        StartReadingCurrentValues();
-                    }
-                    else
-                    {
-                        mVirtualSlave.Stop();
-                        ConnectionStatus = "虚拟模式连接失败";
-                    }
+                    IsConnected = true;
+                    ConnectionStatus = "已连接 · 数据实时更新中";
+                    StartReadingCurrentValues();
+                    StartVirtualMonitorSimulation();
                 }
-                catch (Exception ex)
+                else
                 {
-                    mVirtualSlave?.Stop();
-                    ConnectionStatus = $"虚拟模式启动失败: {ex.Message}";
+                    mVirtualSlave.Stop();
+                    ConnectionStatus = "连接失败";
                 }
             }
-            else
+            catch (Exception ex)
             {
-                // 真实设备模式
-                try
-                {
-                    // 使用选中设备的slaveId，如果未选中则默认1
-                    byte slaveId = SelectedDevice?.slaveId ?? (byte)1;
-                    mModbusService = new ModbusService(DeviceIp, DevicePort, slaveId);
-                    bool success = await mModbusService.ConnectAsync();
-                    if (success)
-                    {
-                        IsConnected = true;
-                        ConnectionStatus = $"已连接 ({DeviceIp}:{DevicePort})";
-                        StartReadingCurrentValues();
-
-                        // 更新设备在线状态
-                        if (SelectedDevice != null)
-                        {
-                            try { await mDatabaseService.UpdateDeviceOnlineStatusAsync(SelectedDevice.id, true); }
-                            catch { /* 忽略数据库更新失败 */ }
-                        }
-                    }
-                    else
-                    {
-                        ConnectionStatus = "连接失败，请检查IP地址和端口号";
-                    }
-                }
-                catch (Exception ex)
-                {
-                    ConnectionStatus = $"连接失败: {ex.Message}";
-                }
+                mVirtualSlave?.Stop();
+                ConnectionStatus = $"连接失败: {ex.Message}";
             }
         }
 
@@ -562,44 +644,44 @@ namespace SmartAgricultureSystem.ViewModels
         }
 
         /// <summary>
-        /// 断开设备连接
-        /// IP地址和端口号输入栏清空，温湿度曲线图初始化
+        /// 断开设备连接，停止数据更新，重置所有大棚数据为0
         /// </summary>
         private async void Disconnect()
         {
-            // 停止采集（如果正在运行）
+            // 停止采集
             StopCollecting();
             // 停止读取当前值
             StopReadingCurrentValues();
+            // 停止大棚数据模拟
+            StopVirtualMonitorSimulation();
 
             mModbusService?.Dispose();
             mVirtualSlave?.Stop();
 
-            // 更新设备离线状态
-            if (SelectedDevice != null && !IsVirtualMode)
-            {
-                try { await mDatabaseService.UpdateDeviceOnlineStatusAsync(SelectedDevice.id, false); }
-                catch { /* 忽略 */ }
-            }
-
             IsConnected = false;
+            IsVirtualMode = true;
             ConnectionStatus = "未连接";
-
-            // 清空IP地址和端口号（虚拟模式保留默认端口）
-            DeviceIp = string.Empty;
-            DevicePort = IsVirtualMode ? 5020 : 0;
 
             // 重置当前温湿度显示
             CurrentTemperature = 0;
             CurrentHumidity = 0;
 
-            // 初始化温湿度曲线图（清空所有数据点）
+            // 重置所有大棚监控数据为0
+            foreach (var gh in GreenhouseMonitorList)
+            {
+                gh.CurrentTemperature = 0;
+                gh.CurrentHumidity = 0;
+                gh.LastUpdateTime = null;
+                gh.IsStabilized = false;
+            }
+            mPreviousTempStatus.Clear();
+            mPreviousHumStatus.Clear();
+
+            // 清空历史数据
+            HistoryData.Clear();
             mTemperatureValues.Clear();
             mHumidityValues.Clear();
             TimeLabels.Clear();
-
-            // 清空历史数据列表
-            HistoryData.Clear();
 
             // 清空预警信息
             LatestAlert = string.Empty;
@@ -696,46 +778,12 @@ namespace SmartAgricultureSystem.ViewModels
         /// <summary>
         /// 切换虚拟模式
         /// </summary>
+        /// <summary>
+        /// 切换虚拟模式（已弃用，保留接口兼容性）
+        /// </summary>
         private async Task ToggleVirtualModeAsync()
         {
-            if (IsRunning)
-            {
-                MessageBox.Show("请先停止采集再切换模式！", "提示");
-                IsVirtualMode = !IsVirtualMode; // 还原切换
-                return;
-            }
-
-            if (mModbusService != null && mModbusService.IsConnected)
-            {
-                Disconnect();
-            }
-
-            if (IsVirtualMode)
-            {
-                ConnectionStatus = "虚拟模式（未连接）";
-                DeviceIp = "127.0.0.1";
-                DevicePort = 5020;
-            }
-            else
-            {
-                ConnectionStatus = "未连接";
-                // 恢复选中设备的IP和端口
-                if (SelectedDevice != null)
-                {
-                    DeviceIp = SelectedDevice.ipAddress ?? "192.168.1.100";
-                    DevicePort = SelectedDevice.port;
-                }
-                else if (DeviceList.Count > 0)
-                {
-                    SelectedDevice = DeviceList[0];
-                }
-                else
-                {
-                    DeviceIp = "192.168.1.100";
-                    DevicePort = 502;
-                }
-            }
-
+            IsVirtualMode = true;
             await Task.CompletedTask;
         }
 
@@ -753,6 +801,67 @@ namespace SmartAgricultureSystem.ViewModels
             {
                 StartReadingCurrentValues();
             }
+        }
+
+        /// <summary>
+        /// 检查单个大棚的预警状态并弹窗提示
+        /// </summary>
+        private void CheckAndAlertGreenhouse(GreenhouseMonitorData gh)
+        {
+            int prevTempStatus = mPreviousTempStatus.ContainsKey(gh.greenhouseId) ? mPreviousTempStatus[gh.greenhouseId] : 0;
+            int prevHumStatus = mPreviousHumStatus.ContainsKey(gh.greenhouseId) ? mPreviousHumStatus[gh.greenhouseId] : 0;
+
+            int curTempStatus = gh.TempStatus;
+            int curHumStatus = gh.HumidityStatus;
+
+            // 温度预警弹窗：状态变化时触发
+            if (curTempStatus != prevTempStatus)
+            {
+                if (curTempStatus == 2)
+                {
+                    string direction = gh.CurrentTemperature <= gh.tempMin ? "低于最低阈值" : "超过最高阈值";
+                    ShowAlertPopup($"【警报】{gh.greenhouseName} 温度{direction}！\n当前温度: {gh.CurrentTemperature:F1}℃ (阈值: {gh.tempMin}~{gh.tempMax}℃)", true);
+                    LatestAlert = $"[{DateTime.Now:HH:mm:ss}] {gh.greenhouseName} 温度{direction}: {gh.CurrentTemperature:F1}℃";
+                }
+                else if (curTempStatus == 1)
+                {
+                    ShowAlertPopup($"【预警】{gh.greenhouseName} 温度接近阈值！\n当前温度: {gh.CurrentTemperature:F1}℃ (阈值: {gh.tempMin}~{gh.tempMax}℃)", false);
+                    LatestAlert = $"[{DateTime.Now:HH:mm:ss}] {gh.greenhouseName} 温度接近阈值: {gh.CurrentTemperature:F1}℃";
+                }
+            }
+
+            // 湿度预警弹窗：状态变化时触发
+            if (curHumStatus != prevHumStatus)
+            {
+                if (curHumStatus == 2)
+                {
+                    string direction = gh.CurrentHumidity <= gh.humidityMin ? "低于最低阈值" : "超过最高阈值";
+                    ShowAlertPopup($"【警报】{gh.greenhouseName} 湿度{direction}！\n当前湿度: {gh.CurrentHumidity:F1}% (阈值: {gh.humidityMin}~{gh.humidityMax}%)", true);
+                    LatestAlert = $"[{DateTime.Now:HH:mm:ss}] {gh.greenhouseName} 湿度{direction}: {gh.CurrentHumidity:F1}%";
+                }
+                else if (curHumStatus == 1)
+                {
+                    ShowAlertPopup($"【预警】{gh.greenhouseName} 湿度接近阈值！\n当前湿度: {gh.CurrentHumidity:F1}% (阈值: {gh.humidityMin}~{gh.humidityMax}%)", false);
+                    LatestAlert = $"[{DateTime.Now:HH:mm:ss}] {gh.greenhouseName} 湿度接近阈值: {gh.CurrentHumidity:F1}%";
+                }
+            }
+
+            mPreviousTempStatus[gh.greenhouseId] = curTempStatus;
+            mPreviousHumStatus[gh.greenhouseId] = curHumStatus;
+        }
+
+        /// <summary>
+        /// 显示预警弹窗（异步避免阻塞模拟线程）
+        /// </summary>
+        private void ShowAlertPopup(string message, bool isAlarm)
+        {
+            _ = System.Windows.Application.Current.Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (isAlarm)
+                    System.Windows.MessageBox.Show(message, "温湿度警报", MessageBoxButton.OK, MessageBoxImage.Error);
+                else
+                    System.Windows.MessageBox.Show(message, "温湿度预警", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }));
         }
 
         /// <summary>

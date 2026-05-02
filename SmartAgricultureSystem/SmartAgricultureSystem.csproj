@@ -102,6 +102,7 @@
     <Compile Include="Models\Device.cs" />
     <Compile Include="Models\Greenhouse.cs" />
     <Compile Include="Models\GreenhouseCrop.cs" />
+    <Compile Include="Models\GreenhouseMonitorData.cs" />
     <Compile Include="Models\LoginRecord.cs" />
     <Compile Include="Models\Sensor.cs" />
     <Compile Include="Models\SensorData.cs" />

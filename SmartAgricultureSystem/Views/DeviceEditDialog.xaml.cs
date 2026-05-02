@@ -1,6 +1,8 @@
 using SmartAgricultureSystem.Models;
 using SmartAgricultureSystem.Services;
 using System;
+using System.Collections.ObjectModel;
+using System.Data;
 using System.Data.SqlClient;
 using System.Windows;
 
@@ -17,6 +19,9 @@ namespace SmartAgricultureSystem.Views
             InitializeComponent();
             mDb = new DatabaseService();
 
+            // 加载大棚列表到下拉框
+            LoadGreenhouses();
+
             if (device != null)
             {
                 mIsEdit = true;
@@ -24,7 +29,8 @@ namespace SmartAgricultureSystem.Views
                 Title = "编辑设备";
                 TxtDeviceCode.Text = device.deviceCode ?? "";
                 TxtName.Text = device.name ?? "";
-                TxtGreenhouseId.Text = device.greenhouseId.ToString();
+                // 设置选中大棚
+                CmbGreenhouse.SelectedValue = device.greenhouseId;
                 CmbDeviceType.SelectedIndex = device.deviceType - 1;
                 if (CmbDeviceType.SelectedIndex < 0) CmbDeviceType.SelectedIndex = 1;
                 TxtIpAddress.Text = device.ipAddress ?? "";
@@ -39,11 +45,33 @@ namespace SmartAgricultureSystem.Views
                 mIsEdit = false;
                 mDevice = new Device();
                 Title = "添加设备";
-                TxtGreenhouseId.Text = "1";
+                CmbGreenhouse.SelectedIndex = 0;
                 CmbDeviceType.SelectedIndex = 1;
                 TxtIpAddress.Text = "192.168.1.100";
                 TxtPort.Text = "502";
                 TxtSlaveId.Text = "1";
+            }
+        }
+
+        private async void LoadGreenhouses()
+        {
+            try
+            {
+                var dt = await mDb.ExecuteQueryAsync("SELECT id, name FROM Greenhouses ORDER BY id");
+                var greenhouses = new ObservableCollection<Greenhouse>();
+                foreach (DataRow row in dt.Rows)
+                {
+                    greenhouses.Add(new Greenhouse
+                    {
+                        id = Convert.ToInt32(row["id"]),
+                        name = row["name"]?.ToString()
+                    });
+                }
+                CmbGreenhouse.ItemsSource = greenhouses;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[设备编辑] 加载大棚列表失败: {ex.Message}");
             }
         }
 
@@ -59,8 +87,13 @@ namespace SmartAgricultureSystem.Views
                 MessageBox.Show("请输入设备名称", "提示");
                 return;
             }
-            if (!int.TryParse(TxtGreenhouseId.Text, out int ghId) ||
-                !int.TryParse(TxtPort.Text, out int port) ||
+            int? ghId = CmbGreenhouse.SelectedValue as int?;
+            if (ghId == null)
+            {
+                MessageBox.Show("请选择所属大棚", "提示");
+                return;
+            }
+            if (!int.TryParse(TxtPort.Text, out int port) ||
                 !byte.TryParse(TxtSlaveId.Text, out byte slaveId))
             {
                 MessageBox.Show("请输入有效的数值", "提示");

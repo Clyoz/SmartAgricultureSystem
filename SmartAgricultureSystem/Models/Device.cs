@@ -20,6 +20,9 @@ namespace SmartAgricultureSystem.Models
         /// <summary>所属大棚ID（关联Greenhouses表）</summary>
         public int greenhouseId { get; set; }
 
+        /// <summary>所属大棚名称（仅用于显示，非数据库字段）</summary>
+        public string greenhouseName { get; set; }
+
         /// <summary>设备类型：1=网关, 2=传感器节点, 3=控制器</summary>
         public int deviceType { get; set; }
 
